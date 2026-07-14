@@ -1,14 +1,82 @@
 services:
+  postgres:
+    build:
+      context: ./docker/postgres
+      dockerfile: Dockerfile
+    container_name: explore-postgres
+    environment:
+      POSTGRES_DB: stats
+      POSTGRES_USER: stats_user
+      POSTGRES_PASSWORD: stats_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U stats_user -d stats" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - explore-network
+      -
   stats-server:
+    build:
+      context: .
+      dockerfile: ewm-stats-service/stats-server/Dockerfile
+    container_name: explore-stats-server
     ports:
       - "9090:9090"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/stats
+      SPRING_DATASOURCE_USERNAME: stats_user
+      SPRING_DATASOURCE_PASSWORD: stats_password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SERVER_PORT: 9090
+      STATS_SERVER_URL: http://stats-server:9090
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - explore-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9090/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  main-server:
+    build:
+      context: .
+      dockerfile: ewm-main-service/main-server/Dockerfile
+    container_name: explore-main-server
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/main
+      SPRING_DATASOURCE_USERNAME: main_user
+      SPRING_DATASOURCE_PASSWORD: main_password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SERVER_PORT: 8080
+      STATS_SERVER_URL: http://stats-server:9090
+    depends_on:
+      postgres:
+        condition: service_healthy
+      stats-server:
+        condition: service_healthy
+    networks:
+      - explore-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 
   stats-db:
     image: postgres:16.1
 
-  ewm-service:
-    ports:
-      - "8080:8080"
 
   ewm-db:
     image: postgres:16.1

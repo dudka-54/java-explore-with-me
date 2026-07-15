@@ -12,7 +12,7 @@ import java.util.List;
 public interface StatRepository extends JpaRepository<EndpointHit, Long> {
 
     @Query("""
-            SELECT new ru.practicum.stats.dto.ViewStats(e.app, e.uri, COUNT(e))
+            SELECT new ru.practicum.ViewStats(e.app, e.uri, COUNT(e))
             FROM EndpointHit e
             WHERE e.timestamp BETWEEN :start AND :end
             GROUP BY e.app, e.uri
@@ -24,7 +24,7 @@ public interface StatRepository extends JpaRepository<EndpointHit, Long> {
     );
 
     @Query("""
-            SELECT new ru.practicum.stats.dto.ViewStats(e.app, e.uri, COUNT(DISTINCT e.ip))
+            SELECT new ru.practicum.ViewStats(e.app, e.uri, COUNT(DISTINCT e.ip))
             FROM EndpointHit e
             WHERE e.timestamp BETWEEN :start AND :end
             GROUP BY e.app, e.uri
@@ -36,7 +36,7 @@ public interface StatRepository extends JpaRepository<EndpointHit, Long> {
     );
 
     @Query("""
-            SELECT new ru.practicum.stats.dto.ViewStats(e.app, e.uri, COUNT(e))
+            SELECT new ru.practicum.ViewStats(e.app, e.uri, COUNT(e))
             FROM EndpointHit e
             WHERE e.timestamp BETWEEN :start AND :end
                 AND e.uri IN :uris
@@ -50,7 +50,7 @@ public interface StatRepository extends JpaRepository<EndpointHit, Long> {
     );
 
     @Query("""
-            SELECT new ru.practicum.stats.dto.ViewStats(e.app, e.uri, COUNT(DISTINCT e.ip))
+            SELECT new ru.practicum.ViewStats(e.app, e.uri, COUNT(DISTINCT e.ip))
             FROM EndpointHit e
             WHERE e.timestamp BETWEEN :start AND :end
                 AND e.uri IN :uris

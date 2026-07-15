@@ -25,16 +25,35 @@ public class StatServiceImpl implements StatService {
 
     @Override
     public List<ViewStats> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, Boolean unique) {
-        log.info("Запрос на получение статистики: метод - getStats;" +
-                "start={}, end={}, uris={}, unique={}", start, end, uris, unique);
+        log.info("Запрос статистики: start={}, end={}, uris={}, unique={}",
+                start, end, uris, unique);
+
         validateDateRange(start, end);
 
         boolean isUnique = unique != null && unique;
-        log.debug("isUnique={}", isUnique);
-        if (uris != null && uris.isEmpty()) {
-            uris = null;
+        boolean hasUris = uris != null && !uris.isEmpty();
+
+        List<ViewStats> result;
+
+        if (!hasUris && !isUnique) {
+            log.debug("Запрос: Без uris, без unique");
+            result = statRepository.getStatsWithoutUrisAndUnique(start, end);
+
+        } else if (!hasUris) {
+            log.debug("Запрос: Без uris, с unique");
+            result = statRepository.getStatsWithoutUrisWithUnique(start, end);
+
+        } else if (!isUnique) {
+            log.debug("Запрос: С uris, без unique");
+            result = statRepository.getStatsWithUrisWithoutUnique(start, end, uris);
+
+        } else {
+            log.debug("Запрос: С uris, с unique");
+            result = statRepository.getStatsWithUrisAndUnique(start, end, uris);
         }
-        return statRepository.getStats(start, end, uris, isUnique);
+
+        log.info("Найдено записей: {}", result.size());
+        return result;
     }
 
     @Override

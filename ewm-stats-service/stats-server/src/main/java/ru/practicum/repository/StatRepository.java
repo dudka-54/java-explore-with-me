@@ -17,7 +17,7 @@ public interface StatRepository extends JpaRepository<EndpointHit, Long> {
             WHERE e.timestamp BETWEEN :start AND :end
                 AND (:uris IS NULL OR e.uri IN :uris)
             GROUP BY e.app, e.uri
-            ORDER BY 
+            ORDER BY
                 CASE WHEN :unique = true THEN COUNT(DISTINCT e.ip) ELSE COUNT(e) END DESC
             """)
     List<ViewStats> getStats(

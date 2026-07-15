@@ -2,15 +2,12 @@ package ru.practicum.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.EndpointHitDto;
-import ru.practicum.EndpointHitMapper;
 import ru.practicum.ViewStats;
-import ru.practicum.model.EndpointHit;
 import ru.practicum.service.StatService;
 
 import java.time.LocalDateTime;
@@ -23,10 +20,7 @@ public class StatController {
     private final StatService statService;
 
     @PostMapping("/hit")
-    public ResponseEntity<Void> saveHit(
-            @Valid @RequestBody EndpointHitDto dto
-    ) {
-
+    public ResponseEntity<Void> saveHit(@Valid @RequestBody EndpointHitDto dto) {
         statService.save(dto);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }

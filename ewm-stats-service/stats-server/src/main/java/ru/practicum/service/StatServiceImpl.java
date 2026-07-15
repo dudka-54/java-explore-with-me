@@ -6,7 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 import ru.practicum.EndpointHitDto;
-import ru.practicum.EndpointHitMapper;
+import ru.practicum.mapper.EndpointHitMapper;
 import ru.practicum.ViewStats;
 import ru.practicum.exception.NotFoundException;
 import ru.practicum.exception.ValidationException;

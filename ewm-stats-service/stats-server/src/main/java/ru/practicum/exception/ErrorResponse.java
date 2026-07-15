@@ -1,11 +1,12 @@
 package ru.practicum.exception;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import lombok.*;
 
-@Getter
+@Data
+@Builder
 @AllArgsConstructor
+@NoArgsConstructor
 public class ErrorResponse {
-    private final String error;
-    private final String description;
+    private String error;
+    private String description;
 }

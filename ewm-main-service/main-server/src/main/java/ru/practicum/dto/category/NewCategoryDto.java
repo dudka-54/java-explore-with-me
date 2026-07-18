@@ -8,13 +8,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@Builder
-@NoArgsConstructor
 @AllArgsConstructor
-public class CategoryDto {
-    private Long id;
-
-    @Size(max = 50, min = 1, message = "max = 50, min = 1")
-    @NotBlank(message = "name не должен быть пустым")
+@NoArgsConstructor
+@Builder
+public class NewCategoryDto {
+    @NotBlank
+    @Size(max = 50, min = 1)
     private String name;
 }

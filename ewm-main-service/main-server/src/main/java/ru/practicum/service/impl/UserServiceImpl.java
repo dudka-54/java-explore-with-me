@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import ru.practicum.dto.user.NewUserRequest;
 import ru.practicum.dto.user.UserDto;
 import ru.practicum.exception.ConflictException;
 import ru.practicum.exception.NotFoundException;
@@ -33,26 +34,23 @@ public class UserServiceImpl implements UserService {
 
         Page<User> userPage = userRepository.findAllByIds(ids, pageable);
 
-        return userPage.getContent().stream()
-                .map(userMapper::toDto)
-                .collect(Collectors.toList());
+        return userMapper.toDtoList(userPage.getContent());
+
     }
 
 
-    @Transactional
     @Override
-    public UserDto createUser(UserDto userDto) {
-        log.debug("Создание нового пользователя: {}", userDto);
+    public UserDto createUser(NewUserRequest newUser) {
+        log.debug("Создание нового пользователя: {}", newUser);
 
-        validateUserDto(userDto);
-
-        if (userRepository.existsByEmail(userDto.getEmail())) {
-            log.warn("Попытка создать пользователя с существующим email: {}", userDto.getEmail());
-            throw new ConflictException("Пользователь с email " + userDto.getEmail() + " уже существует");
+        if (userRepository.existsByEmail(newUser.getEmail())) {
+            log.warn("Попытка создать пользователя с существующим email: {}", newUser.getEmail());
+            throw new ConflictException("Пользователь с email " + newUser.getEmail() + " уже существует");
         }
 
         try {
-            User user = userMapper.toEntity(userDto);
+            User user = userMapper.toUserFromRequest(newUser);
+            validateUser(user);
             User savedUser = userRepository.save(user);
 
             log.info("Пользователь создан: id={}, email={}", savedUser.getId(), savedUser.getEmail());
@@ -64,7 +62,6 @@ public class UserServiceImpl implements UserService {
         }
     }
 
-    @Transactional
     @Override
     public void deleteUser(Long userId) {
         log.debug("Удаление пользователя с ID: {}", userId);
@@ -94,29 +91,29 @@ public class UserServiceImpl implements UserService {
                 });
     }
 
-    private void validateUserDto(UserDto userDto) {
-        if (userDto == null) {
+    private void validateUser(User user) {
+        if (user == null) {
             throw new ValidationException("Данные пользователя не могут быть null");
         }
 
-        if (userDto.getName() == null || userDto.getName().isBlank()) {
+        if (user.getName() == null || user.getName().isBlank()) {
             throw new ValidationException("Имя пользователя не может быть пустым");
         }
 
-        if (userDto.getName().length() < 2) {
+        if (user.getName().length() < 2) {
             throw new ValidationException("Имя пользователя должно содержать минимум 2 символа");
         }
 
-        if (userDto.getName().length() > 255) {
+        if (user.getName().length() > 255) {
             throw new ValidationException("Имя пользователя не может превышать 255 символов");
         }
 
-        if (userDto.getEmail() == null || userDto.getEmail().isBlank()) {
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
             throw new ValidationException("Email пользователя не может быть пустым");
         }
 
-        if (!isValidEmail(userDto.getEmail())) {
-            throw new ValidationException("Некорректный формат email: " + userDto.getEmail());
+        if (!isValidEmail(user.getEmail())) {
+            throw new ValidationException("Некорректный формат email: " + user.getEmail());
         }
     }
 

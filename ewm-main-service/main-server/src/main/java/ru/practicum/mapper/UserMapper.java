@@ -4,7 +4,9 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.ReportingPolicy;
+import ru.practicum.dto.user.NewUserRequest;
 import ru.practicum.dto.user.UserDto;
+import ru.practicum.dto.user.UserShortDto;
 import ru.practicum.model.User;
 
 import java.util.List;
@@ -15,9 +17,6 @@ import java.util.List;
 )
 public interface UserMapper {
 
-    /**
-     * User → UserDto
-     */
     @Mapping(target = "id", source = "id")
     @Mapping(target = "email", source = "email")
     @Mapping(target = "name", source = "name")
@@ -29,4 +28,10 @@ public interface UserMapper {
     List<UserDto> toDtoList(List<User> users);
 
     List<User> toEntityList(List<UserDto> userDtos);
+
+    @Mapping(target = "id", ignore = true)
+    User toUserFromRequest(NewUserRequest request);
+
+    List<UserShortDto> toShortDtoList(List<User> users);
+
 }

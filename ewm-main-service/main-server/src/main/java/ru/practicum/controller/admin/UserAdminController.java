@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.StatClient;
 import ru.practicum.controller.StatsMainSaver;
+import ru.practicum.dto.user.NewUserRequest;
 import ru.practicum.dto.user.UserDto;
 import ru.practicum.service.UserService;
 
@@ -36,7 +37,7 @@ public class UserAdminController implements StatsMainSaver {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ResponseEntity<UserDto> createUser(@Valid @RequestBody UserDto userDto,
+    public ResponseEntity<UserDto> createUser(@Valid @RequestBody NewUserRequest userDto,
                               HttpServletRequest request) {
         saveStat(uri, request);
         return ResponseEntity.ok(userService.createUser(userDto));

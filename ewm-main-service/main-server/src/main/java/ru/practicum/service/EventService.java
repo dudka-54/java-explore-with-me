@@ -1,7 +1,5 @@
 package ru.practicum.service;
 
-import jdk.jfr.Event;
-import org.springframework.data.jpa.repository.JpaRepository;
 import ru.practicum.dto.event.*;
 import ru.practicum.dto.request.ParticipationRequestDto;
 import ru.practicum.model.User;
@@ -20,7 +18,7 @@ public interface EventService {
 
     EventFullDto patchEvent(Long userId, Long eventId, UpdateEventUserRequest eventDto);
 
-    ParticipationRequestDto getRequestEvent(Long userId, Long eventId);
+    List<ParticipationRequestDto> getRequestEvent(Long userId, Long eventId);
 
     EventRequestStatusUpdateResult patchRequestEvent(Long userId, Long eventId,
                                                      EventRequestStatusUpdateRequest updateRequest);

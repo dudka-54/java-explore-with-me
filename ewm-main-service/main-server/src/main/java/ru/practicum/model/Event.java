@@ -65,5 +65,4 @@ public class Event {
 
     @Transient
     private Integer views;
-
 }

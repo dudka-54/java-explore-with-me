@@ -13,6 +13,7 @@ import ru.practicum.model.*;
 import ru.practicum.repository.EventRepository;
 import ru.practicum.repository.RequestRepository;
 import ru.practicum.repository.UserRepository;
+import ru.practicum.service.RequestService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,7 +22,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
-public class RequestServiceImpl {
+public class RequestServiceImpl implements RequestService {
 
     private final RequestRepository requestRepository;
     private final EventRepository eventRepository;
@@ -31,6 +32,13 @@ public class RequestServiceImpl {
     @Transactional
     public ParticipationRequestDto createRequest(Long userId, Long eventId) {
         log.info("Создание запроса на участие: userId={}, eventId={}", userId, eventId);
+
+        if (userId == null) {
+            throw new ValidationException("userId не может быть null");
+        }
+        if (eventId == null) {
+            throw new ValidationException("eventId не может быть null");
+        }
 
         User user = findUserOrThrow(userId);
 
@@ -53,6 +61,20 @@ public class RequestServiceImpl {
             throw new ConflictException("Вы уже подали заявку на это событие");
         }
 
+        int participantLimit = event.getParticipantLimit();
+        int confirmedRequests = event.getConfirmedRequests();
+
+        if (participantLimit > 0 && confirmedRequests >= participantLimit) {
+            log.warn("Лимит участников исчерпан: eventId={}, limit={}, confirmed={}",
+                    eventId, participantLimit, confirmedRequests);
+            throw new ConflictException("Достигнут лимит запросов на участие в событии");
+        }
+
+        if (requestRepository.existsByEventIdAndRequesterId(eventId, userId)) {
+            log.warn("Попытка повторной подачи заявки: userId={}, eventId={}", userId, eventId);
+            throw new ConflictException("Нельзя добавить повторный запрос на участие");
+        }
+
         Request request = Request.builder()
                 .event(event)
                 .requester(user)
@@ -60,38 +82,53 @@ public class RequestServiceImpl {
                 .status(RequestStatus.PENDING)
                 .build();
 
-        if (!event.getRequestModeration() || event.getParticipantLimit() == 0) {
+        if (!event.getRequestModeration() || participantLimit == 0) {
             request.setStatus(RequestStatus.CONFIRMED);
-            event.setConfirmedRequests(event.getConfirmedRequests() + 1);
+            event.setConfirmedRequests(confirmedRequests + 1);
+            eventRepository.save(event);
+            log.info("Запрос автоматически подтверждён: userId={}, eventId={}", userId, eventId);
         }
 
         Request savedRequest = requestRepository.save(request);
-        eventRepository.save(event);
-
         log.info("Запрос создан: userId={}, eventId={}, status={}",
-                userId, eventId, request.getStatus());
+                userId, eventId, savedRequest.getStatus());
 
         return requestMapper.toDto(savedRequest);
     }
 
+    @Override
     @Transactional
     public ParticipationRequestDto cancelRequest(Long userId, Long requestId) {
         log.info("Отмена запроса: userId={}, requestId={}", userId, requestId);
 
+        if (userId == null) {
+            throw new ValidationException("userId не может быть null");
+        }
+        if (requestId == null) {
+            throw new ValidationException("requestId не может быть null");
+        }
+
+        findUserOrThrow(userId);
+
         Request request = findRequestOrThrow(requestId);
 
         if (!request.getRequester().getId().equals(userId)) {
-            throw new ValidationException("Вы можете отменить только свои запросы");
+            log.warn("Попытка отмены чужого запроса: userId={}, requestId={}, requesterId={}",
+                    userId, requestId, request.getRequester().getId());
+            throw new NotFoundException(
+                    String.format("Запрос с id=%d не найден или недоступен", requestId)
+            );
         }
 
         if (request.getStatus() == RequestStatus.CONFIRMED) {
-            throw new ValidationException("Нельзя отменить подтвержденный запрос");
+            log.warn("Попытка отмены подтверждённого запроса: userId={}, requestId={}", userId, requestId);
+            throw new ConflictException("Нельзя отменить уже подтверждённый запрос");
         }
 
         request.setStatus(RequestStatus.CANCELED);
         Request canceledRequest = requestRepository.save(request);
 
-        log.info("Запрос отменен: userId={}, requestId={}", userId, requestId);
+        log.info("Запрос отменён: userId={}, requestId={}", userId, requestId);
 
         return requestMapper.toDto(canceledRequest);
     }

@@ -38,7 +38,6 @@ public class UserServiceImpl implements UserService {
 
     }
 
-
     @Override
     public UserDto createUser(NewUserRequest newUser) {
         log.debug("Создание нового пользователя: {}", newUser);

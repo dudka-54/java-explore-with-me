@@ -3,6 +3,7 @@ package ru.practicum.controller.admin;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.StatClient;
@@ -11,40 +12,30 @@ import ru.practicum.dto.category.CategoryDto;
 import ru.practicum.dto.category.NewCategoryDto;
 import ru.practicum.service.CategoryService;
 
-import java.util.List;
 
 @RestController
 @RequestMapping("/admin/categories")
 @RequiredArgsConstructor
-public class CategoryAdminController implements StatsMainSaver {
+public class CategoryAdminController {
+
     private final CategoryService categoryService;
-    private final StatClient statClient;
-    private final String uri = "/admin/categories";
 
     @PostMapping
-    public ResponseEntity<CategoryDto> addCategory(@Valid @RequestBody NewCategoryDto categoryDto,
-                                                   HttpServletRequest request) {
-        saveStat(uri, request);
-        return null;
+    public ResponseEntity<CategoryDto> addCategory(@Valid @RequestBody NewCategoryDto categoryDto) {
+        CategoryDto created = categoryService.addCategory(categoryDto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    @DeleteMapping("/catId")
-    public ResponseEntity<Void> deleteCategory(@PathVariable Long catId,
-                                               HttpServletRequest request) {
-        saveStat(uri, request, String.valueOf(catId));
-        return null;
+    @DeleteMapping("/{catId}")
+    public ResponseEntity<Void> deleteCategory(@PathVariable Long catId) {
+        categoryService.deleteCategory(catId);
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{catId}")
     public ResponseEntity<CategoryDto> patchCategory(@Valid @RequestBody NewCategoryDto categoryDto,
-                                                     @PathVariable Long catId,
-                                                     HttpServletRequest request) {
-        saveStat(uri, request);
-        return null;
-    }
-
-    @Override
-    public StatClient getStatsClient() {
-        return statClient;
+                                                     @PathVariable Long catId) {
+        CategoryDto updated = categoryService.patchCategory(categoryDto, catId);
+        return ResponseEntity.ok(updated);
     }
 }

@@ -5,8 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.dto.event.*;
+import ru.practicum.dto.event.enumerated.AdminStateAction;
+import ru.practicum.dto.event.enumerated.StateAction;
+import ru.practicum.dto.event.enumerated.UserStateAction;
 import ru.practicum.dto.request.ParticipationRequestDto;
 import ru.practicum.exception.ConflictException;
 import ru.practicum.exception.NotFoundException;
@@ -23,7 +28,9 @@ import ru.practicum.service.EventService;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +44,7 @@ public class EventServiceImpl implements EventService {
     private final RequestRepository requestRepository;
     private final RequestMapper requestMapper;
 
+    @Transactional(readOnly = true)
     @Override
     public List<EventShortDto> getEvents(Long userId, Integer from, Integer size) {
         log.info("Приватный запрос на получение событий по userId - {}, from - {}, size-{}", userId, from, size);
@@ -70,6 +78,7 @@ public class EventServiceImpl implements EventService {
         return eventMapper.toFullDto(savedEvent);
     }
 
+    @Transactional(readOnly = true)
     @Override
     public EventFullDto getEvent(Long userId, Long eventId) {
         log.info("Запрос на получение события по userId={}, eventId={}", userId, eventId);
@@ -192,6 +201,7 @@ public class EventServiceImpl implements EventService {
         return eventMapper.toFullDto(updatedEvent);
     }
 
+    @Transactional(readOnly = true)
     @Override
     public List<ParticipationRequestDto> getRequestEvent(Long userId, Long eventId) {
         log.info("Получение информации о запросах на участие в событии текущего пользователя" +
@@ -326,38 +336,269 @@ public class EventServiceImpl implements EventService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     @Override
-    public List<EventFullDto> getAdminEvents(List<User> users,
-                                             List<String> states,
-                                             List<Long> categories,
-                                             LocalDateTime rangeStart,
-                                             LocalDateTime rangeEnd,
-                                             Integer from,
-                                             Integer size) {
-        return List.of();
+    public List<EventFullDto> getAdminEvents(
+            List<Long> users,
+            List<String> states,
+            List<Long> categories,
+            LocalDateTime rangeStart,
+            LocalDateTime rangeEnd,
+            Integer from,
+            Integer size
+    ) {
+        log.info("Поиск событий администратором: users={}, states={}, categories={}, " +
+                        "rangeStart={}, rangeEnd={}, from={}, size={}",
+                users, states, categories, rangeStart, rangeEnd, from, size);
+
+        if (from == null) from = 0;
+        if (size == null) size = 10;
+
+        if (from < 0) {
+            throw new ValidationException("from не может быть отрицательным");
+        }
+        if (size < 1) {
+            throw new ValidationException("size должен быть больше 0");
+        }
+
+        List<EventStatus> statuses = null;
+        if (states != null && !states.isEmpty()) {
+            statuses = states.stream()
+                    .map(state -> {
+                        try {
+                            return EventStatus.valueOf(state.toUpperCase());
+                        } catch (IllegalArgumentException e) {
+                            throw new ValidationException("Некорректный статус: " + state +
+                                    ". Допустимые значения: PENDING, PUBLISHED, CANCELED");
+                        }
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        Pageable pageable = PageRequest.of(from / size, size);
+
+        Page<Event> eventPage = eventRepository.findAdminEvents(
+                users,
+                statuses,
+                categories,
+                rangeStart,
+                rangeEnd,
+                pageable
+        );
+
+        if (eventPage.isEmpty()) {
+            log.info("События не найдены");
+            return Collections.emptyList();
+        }
+
+        List<EventFullDto> eventDtos = eventPage.getContent().stream()
+                .map(eventMapper::toFullDto)
+                .collect(Collectors.toList());
+
+        log.info("Найдено {} событий", eventDtos.size());
+        return eventDtos;
     }
 
     @Override
-    public UpdateEventUserRequest patchAdminEvent(Long eventId) {
-        return null;
+    public EventFullDto patchAdminEvent(Long eventId, UpdateEventAdminRequest request) {
+        if (eventId == null || request == null) {
+            throw new ValidationException("Параметры не могут быть null");
+        }
+
+        Event event = findEventOrThrow(eventId);
+
+        if (request.getStateAction() == AdminStateAction.PUBLISH_EVENT) {
+            if (event.getState() != EventStatus.PENDING) {
+                log.warn("Попытка публикации события не в статусе PENDING: eventId={}, state={}",
+                        eventId, event.getState());
+                throw new ConflictException(
+                        "Событие можно опубликовать только если оно в состоянии ожидания (PENDING). " +
+                                "Текущий статус: " + event.getState()
+                );
+            }
+        }
+
+        if (request.getStateAction() == AdminStateAction.REJECT_EVENT) {
+            if (event.getState() == EventStatus.PUBLISHED) {
+                log.warn("Попытка отклонения опубликованного события: eventId={}", eventId);
+                throw new ConflictException(
+                        "Нельзя отклонить уже опубликованное событие. Текущий статус: " + event.getState()
+                );
+            }
+        }
+
+        if (request.getEventDate() != null) {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime minEventDate = now.plusHours(1);
+
+            if (request.getEventDate().isBefore(minEventDate)) {
+                throw new ConflictException(
+                        String.format(
+                                "Дата события должна быть не ранее чем за час от текущего момента. " +
+                                        "Текущее время: %s, минимальная дата: %s",
+                                now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                                minEventDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                        )
+                );
+            }
+        } else {
+            log.warn("eventDate не может быть null");
+            throw new ConflictException("eventDate не может быть null");
+        }
+
+        if (request.getAnnotation() != null) {
+            event.setAnnotation(request.getAnnotation());
+        }
+
+        if (request.getDescription() != null) {
+            event.setDescription(request.getDescription());
+        }
+
+        if (request.getTitle() != null) {
+            event.setTitle(request.getTitle());
+        }
+
+        if (request.getEventDate() != null) {
+            event.setEventDate(request.getEventDate());
+        }
+
+        if (request.getLocation() != null) {
+            event.setLocation(request.getLocation());
+        }
+
+        if (request.getPaid() != null) {
+            event.setPaid(request.getPaid());
+        }
+
+        if (request.getParticipantLimit() != null) {
+            event.setParticipantLimit(request.getParticipantLimit());
+        }
+
+        if (request.getRequestModeration() != null) {
+            event.setRequestModeration(request.getRequestModeration());
+        }
+
+        if (request.getCategory() != null) {
+            Category category = categoryRepository.findById(request.getCategory())
+                    .orElseThrow(() -> new NotFoundException(
+                            "Категория с ID " + request.getCategory() + " не найдена"
+                    ));
+            event.setCategory(category);
+        }
+
+        if (request.getStateAction() != null) {
+            switch (request.getStateAction()) {
+                case PUBLISH_EVENT:
+                    event.setState(EventStatus.PUBLISHED);
+                    event.setPublishedOn(LocalDateTime.now());
+                    log.info("Событие опубликовано администратором: eventId={}", eventId);
+                    break;
+
+                case REJECT_EVENT:
+                    event.setState(EventStatus.CANCELED);
+                    log.info("Событие отклонено администратором: eventId={}", eventId);
+                    break;
+
+                default:
+                    throw new ValidationException("Некорректное действие: " + request.getStateAction());
+            }
+        }
+
+        Event updatedEvent = eventRepository.save(event);
+        log.info("Событие обновлено администратором: eventId={}", eventId);
+
+        return eventMapper.toFullDto(updatedEvent);
     }
 
+
+    @Transactional(readOnly = true)
     @Override
-    public List<EventShortDto> getPublicEvents(String text,
-                                               List<Long> categories,
-                                               Boolean paid,
-                                               LocalDateTime rangeStart,
-                                               LocalDateTime rangeEnd,
-                                               Boolean onlyAvailable,
-                                               String sort,
-                                               Integer from,
-                                               Integer size) {
-        return List.of();
+    public List<EventShortDto> getPublicEvents(
+            String text,
+            List<Long> categories,
+            Boolean paid,
+            LocalDateTime rangeStart,
+            LocalDateTime rangeEnd,
+            Boolean onlyAvailable,
+            String sort,
+            Integer from,
+            Integer size
+    ) {
+        log.info("Публичный запрос событий: text={}, categories={}, paid={}, rangeStart={}, rangeEnd={}, " +
+                        "onlyAvailable={}, sort={}, from={}, size={}",
+                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size);
+        if (from < 0) {
+            throw new ValidationException("from не может быть отрицательным");
+        }
+        if (size < 1) {
+            throw new ValidationException("size должен быть больше 0");
+        }
+
+        LocalDateTime start = rangeStart;
+        LocalDateTime end = rangeEnd;
+
+        if (start == null) {
+            start = LocalDateTime.now();
+        }
+        if (end == null) {
+            end = LocalDateTime.now().plusYears(100);
+        }
+
+        if (start.isAfter(end)) {
+            throw new ValidationException("rangeStart должен быть раньше rangeEnd");
+        }
+
+        boolean onlyAvailableEvents = onlyAvailable != null && onlyAvailable;
+
+        Sort sortBy = Sort.by("eventDate").ascending();
+        if ("VIEWS".equalsIgnoreCase(sort)) {
+            sortBy = Sort.by("views").descending();
+        }
+
+        Pageable pageable = PageRequest.of(from / size, size, sortBy);
+
+        Page<Event> eventPage = eventRepository.findPublicEvents(
+                text,
+                categories,
+                paid,
+                start,
+                end,
+                onlyAvailableEvents,
+                pageable
+        );
+
+        if (eventPage.isEmpty()) {
+            log.info("Публичные события не найдены");
+            return Collections.emptyList();
+        }
+
+        List<EventShortDto> eventDtos = eventPage.getContent().stream()
+                .map(eventMapper::toShortDto)
+                .collect(Collectors.toList());
+
+        log.info("Найдено {} публичных событий", eventDtos.size());
+        return eventDtos;
     }
 
+    @Transactional(readOnly = true)
     @Override
     public EventFullDto getPublicEvent(Long id) {
-        return null;
+        log.info("Получение публичного ивента по id={}", id);
+        if (id == null) {
+            throw new ValidationException("Параметр id не может быть null");
+        }
+
+        Event event = findEventOrThrow(id);
+
+        if (event.getViews() == null || event.getConfirmedRequests() == null) {
+            throw new ValidationException("views и подтвержденные запросы не должны быть null");
+        }
+
+        if (event.getState() != EventStatus.PUBLISHED) {
+            throw new ConflictException("Событие должно быть опубликовано");
+        }
+
+        return eventMapper.toFullDto(event);
     }
 
     private void userIsNotInitiator(Event event, Long userId) {

@@ -15,13 +15,8 @@ import java.util.List;
 @NoArgsConstructor
 @Builder
 public class CompilationDto {
-    @NotNull(message = "id не должен быть пуст")
     private Long id;
     private List<EventShortDto> events;
-
-    @NotNull(message = "pinned не должен быть пуст")
     private Boolean pinned;
-
-    @NotBlank(message = "title не должен быть пуст")
     private String title;
 }

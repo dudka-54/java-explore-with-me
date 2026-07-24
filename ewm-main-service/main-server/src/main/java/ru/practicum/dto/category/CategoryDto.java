@@ -1,7 +1,5 @@
 package ru.practicum.dto.category;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,7 +12,5 @@ import lombok.NoArgsConstructor;
 public class CategoryDto {
     private Long id;
 
-    @Size(max = 50, min = 1, message = "max = 50, min = 1")
-    @NotBlank(message = "name не должен быть пустым")
     private String name;
 }

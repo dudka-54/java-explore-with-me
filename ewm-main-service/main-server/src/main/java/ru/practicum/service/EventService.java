@@ -1,5 +1,6 @@
 package ru.practicum.service;
 
+import jakarta.transaction.Transactional;
 import ru.practicum.dto.event.*;
 import ru.practicum.dto.request.ParticipationRequestDto;
 import ru.practicum.model.User;
@@ -7,6 +8,7 @@ import ru.practicum.model.User;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Transactional
 public interface EventService {
     //private
 
@@ -25,12 +27,11 @@ public interface EventService {
 
     //admin
 
-    List<EventFullDto> getAdminEvents(List<User> users, List<String> states,
+    List<EventFullDto> getAdminEvents(List<Long> users, List<String> states,
                                       List<Long> categories, LocalDateTime rangeStart,
                                       LocalDateTime rangeEnd, Integer from, Integer size);
 
-    UpdateEventUserRequest patchAdminEvent(Long eventId);
-
+    public EventFullDto patchAdminEvent(Long eventId, UpdateEventAdminRequest request);
 
     //public
 

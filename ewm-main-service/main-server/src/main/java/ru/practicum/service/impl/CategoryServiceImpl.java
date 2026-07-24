@@ -16,6 +16,7 @@ import ru.practicum.mapper.CategoryMapper;
 import ru.practicum.model.Category;
 import ru.practicum.model.User;
 import ru.practicum.repository.CategoryRepository;
+import ru.practicum.repository.EventRepository;
 import ru.practicum.service.CategoryService;
 
 import java.util.List;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class CategoryServiceImpl implements CategoryService {
     private final CategoryRepository categoryRepository;
+    private final EventRepository eventRepository;
     private final CategoryMapper categoryMapper;
 
     @Override
@@ -73,12 +75,19 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public void deleteCategory(Long catId) {
-        //ДОБАВИТЬ ПОТОМ ПРОВЕРКУ EVENT
         log.debug("Запрос на удаление категории с id - {}");
         Category category = findCategoryOrThrow(catId);
+        boolean hasEvents = eventRepository.existsByCategoryId(catId);
+
+        if (hasEvents) {
+            log.warn("Попытка удаления категории, которая используется в событиях: catId={}", catId);
+            throw new ConflictException("Невозможно удалить категорию, так как она связана с событиями");
+        }
+
         try {
             categoryRepository.delete(category);
             log.info("Категория удалена: id={}, name={}", catId, category.getName());
+
         } catch (DataIntegrityViolationException e) {
             log.error("Ошибка при удалении категории: {}", e.getMessage());
             throw new ConflictException("Невозможно удалить категорию, так как она связана с другими данными.");

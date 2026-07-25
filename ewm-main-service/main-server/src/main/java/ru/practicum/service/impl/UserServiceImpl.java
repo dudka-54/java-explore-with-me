@@ -19,7 +19,6 @@ import ru.practicum.repository.UserRepository;
 import ru.practicum.service.UserService;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor

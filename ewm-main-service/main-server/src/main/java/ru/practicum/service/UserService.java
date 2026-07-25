@@ -1,7 +1,6 @@
 package ru.practicum.service;
 
 import jakarta.transaction.Transactional;
-import ru.practicum.dto.category.NewCategoryDto;
 import ru.practicum.dto.user.NewUserRequest;
 import ru.practicum.dto.user.UserDto;
 

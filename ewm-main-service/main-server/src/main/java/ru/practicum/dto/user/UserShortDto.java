@@ -1,7 +1,5 @@
 package ru.practicum.dto.user;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,8 +11,5 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UserShortDto {
     private Long id;
-
-    @NotBlank(message = "Имя не может быть пустым")
-    @Size(min = 2, max = 255, message = "Имя должно быть от 2 до 255 символов")
     private String name;
 }

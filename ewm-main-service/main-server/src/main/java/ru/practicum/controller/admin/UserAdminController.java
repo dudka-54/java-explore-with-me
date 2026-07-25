@@ -13,7 +13,6 @@ import ru.practicum.dto.user.UserDto;
 import ru.practicum.service.UserService;
 
 import java.util.List;
-import java.util.Optional;
 
 
 @RestController

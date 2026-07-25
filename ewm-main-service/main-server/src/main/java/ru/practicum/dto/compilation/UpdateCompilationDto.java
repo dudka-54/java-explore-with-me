@@ -4,16 +4,15 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import ru.practicum.dto.event.EventShortDto;
 
 import java.util.List;
 
 @Data
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
-public class UpdateCompilationRequest {
-    private List<EventShortDto> events;
+@AllArgsConstructor
+public class UpdateCompilationDto {
+    private List<Long> events;
 
     private Boolean pinned;
 

@@ -3,7 +3,6 @@ package ru.practicum.service;
 import jakarta.transaction.Transactional;
 import ru.practicum.dto.event.*;
 import ru.practicum.dto.request.ParticipationRequestDto;
-import ru.practicum.model.User;
 
 import java.time.LocalDateTime;
 import java.util.List;

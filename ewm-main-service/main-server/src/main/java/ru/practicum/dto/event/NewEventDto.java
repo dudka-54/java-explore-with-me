@@ -1,6 +1,7 @@
 package ru.practicum.dto.event;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -14,15 +15,16 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 public class NewEventDto {
+
     @NotBlank(message = "Аннотация не может быть пустой")
-    @Size(max = 2000, min = 20, message = "Длина от 20 до 2000")
+    @Size(min = 20, max = 2000, message = "Аннотация должна быть от 20 до 2000 символов")
     private String annotation;
 
     @NotNull(message = "Категория обязательна")
     private Long category;
 
     @NotBlank(message = "Описание не может быть пустым")
-    @Size(max = 7000, min = 20, message = "Длина от 20 до 7000")
+    @Size(min = 20, max = 7000, message = "Описание должно быть от 20 до 7000 символов")
     private String description;
 
     @NotNull(message = "Дата события обязательна")
@@ -36,6 +38,7 @@ public class NewEventDto {
     private Boolean paid = false;
 
     @Builder.Default
+    @Min(value = 0, message = "Лимит участников не может быть отрицательным")
     private Integer participantLimit = 0;
 
     @Builder.Default

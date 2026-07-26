@@ -46,19 +46,19 @@ public class Event {
 
     @Column(name = "participant_limit", nullable = false)
     @Builder.Default
-    private Integer participantLimit;
+    private Integer participantLimit = 0;
 
     @Column(name = "published_on")
     private LocalDateTime publishedOn;
 
     @Column(name = "request_moderation", nullable = false)
     @Builder.Default
-    private Boolean requestModeration;
+    private Boolean requestModeration = true;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private EventStatus state;
+    private EventStatus state = EventStatus.PENDING;
 
     @Column(nullable = false, length = 512)
     private String title;

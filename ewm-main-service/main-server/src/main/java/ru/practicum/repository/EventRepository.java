@@ -12,7 +12,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface EventRepository extends JpaRepository<Event, Long> {
-    Page<Event> findByUserId(Long userId, Pageable pageable);
+
+    @Query("SELECT e FROM Event e WHERE e.initiator.id = :userId")
+    Page<Event> findEventsByInitiatorId(@Param("userId") Long userId, Pageable pageable);
 
     @Query("""
             SELECT DISTINCT e FROM Event e

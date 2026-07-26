@@ -48,7 +48,7 @@ public class EventServiceImpl implements EventService {
         log.info("Приватный запрос на получение событий по userId - {}, from - {}, size-{}", userId, from, size);
 
         Pageable pageable = PageRequest.of(from / size, size);
-        Page<Event> eventPage = eventRepository.findByUserId(userId, pageable);
+        Page<Event> eventPage = eventRepository.findEventsByInitiatorId(userId, pageable);
         if (!(eventPage.hasContent())) {
             return List.of();
         }

@@ -1,5 +1,6 @@
 package ru.practicum.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -52,6 +53,22 @@ public class ErrorHandler {
                 .reason("Validation failed")
                 .message(e.getMessage())
                 .errors(List.of(e.getMessage()))
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleConstraintViolation(ConstraintViolationException ex) {
+        List<String> errors = ex.getConstraintViolations().stream()
+                .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
+                .collect(Collectors.toList());
+
+        return ApiError.builder()
+                .status(HttpStatus.valueOf(HttpStatus.BAD_REQUEST.name()))
+                .reason("Incorrectly made request")
+                .message(String.join("; ", errors))
+                .errors(errors)
                 .timestamp(LocalDateTime.now())
                 .build();
     }

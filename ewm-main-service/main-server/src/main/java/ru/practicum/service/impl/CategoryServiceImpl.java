@@ -52,6 +52,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
+    @Transactional
     public CategoryDto addCategory(NewCategoryDto categoryDto) {
         log.debug("Добавление новой категории: {}", categoryDto);
 
@@ -73,6 +74,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
+    @Transactional
     public void deleteCategory(Long catId) {
         log.debug("Запрос на удаление категории с id - {}");
         Category category = findCategoryOrThrow(catId);
@@ -94,6 +96,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
+    @Transactional
     public CategoryDto patchCategory(NewCategoryDto categoryDto, Long id) {
         Category category = findCategoryOrThrow(id);
 

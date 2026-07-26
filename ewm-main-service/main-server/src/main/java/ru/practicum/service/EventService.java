@@ -1,13 +1,11 @@
 package ru.practicum.service;
 
-import jakarta.transaction.Transactional;
 import ru.practicum.dto.event.*;
 import ru.practicum.dto.request.ParticipationRequestDto;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Transactional
 public interface EventService {
     //private
 

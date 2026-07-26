@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class EventServiceImpl implements EventService {
 
     private final EventRepository eventRepository;
@@ -42,7 +43,6 @@ public class EventServiceImpl implements EventService {
     private final RequestRepository requestRepository;
     private final RequestMapper requestMapper;
 
-    @Transactional(readOnly = true)
     @Override
     public List<EventShortDto> getEvents(Long userId, Integer from, Integer size) {
         log.info("Приватный запрос на получение событий по userId - {}, from - {}, size-{}", userId, from, size);
@@ -56,6 +56,7 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
+    @Transactional
     public EventFullDto saveEvent(Long userId, NewEventDto newEventDto) {
         log.info("Приватный запрос на создание пользователя, userId={}, newEventDto={}", userId, newEventDto);
         User initiator = findUserOrThrow(userId);
@@ -76,7 +77,6 @@ public class EventServiceImpl implements EventService {
         return eventMapper.toFullDto(savedEvent);
     }
 
-    @Transactional(readOnly = true)
     @Override
     public EventFullDto getEvent(Long userId, Long eventId) {
         log.info("Запрос на получение события по userId={}, eventId={}", userId, eventId);
@@ -100,6 +100,7 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
+    @Transactional
     public EventFullDto patchEvent(Long userId, Long eventId, UpdateEventUserRequest eventDto) {
         log.info("Запрос на обновление события по userId={}, eventId={}, eventDto={}",
                 userId, eventId, eventDto);
@@ -199,7 +200,6 @@ public class EventServiceImpl implements EventService {
         return eventMapper.toFullDto(updatedEvent);
     }
 
-    @Transactional(readOnly = true)
     @Override
     public List<ParticipationRequestDto> getRequestEvent(Long userId, Long eventId) {
         log.info("Получение информации о запросах на участие в событии текущего пользователя" +
@@ -226,6 +226,7 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
+    @Transactional
     public EventRequestStatusUpdateResult patchRequestEvent(Long userId,
                                                             Long eventId,
                                                             EventRequestStatusUpdateRequest updateRequest) {
@@ -334,7 +335,6 @@ public class EventServiceImpl implements EventService {
                 .build();
     }
 
-    @Transactional(readOnly = true)
     @Override
     public List<EventFullDto> getAdminEvents(
             List<Long> users,
@@ -398,6 +398,7 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
+    @Transactional
     public EventFullDto patchAdminEvent(Long eventId, UpdateEventAdminRequest request) {
         if (eventId == null || request == null) {
             throw new ValidationException("Параметры не могут быть null");
@@ -509,7 +510,6 @@ public class EventServiceImpl implements EventService {
     }
 
 
-    @Transactional(readOnly = true)
     @Override
     public List<EventShortDto> getPublicEvents(
             String text,
@@ -578,7 +578,6 @@ public class EventServiceImpl implements EventService {
         return eventDtos;
     }
 
-    @Transactional(readOnly = true)
     @Override
     public EventFullDto getPublicEvent(Long id) {
         log.info("Получение публичного ивента по id={}", id);

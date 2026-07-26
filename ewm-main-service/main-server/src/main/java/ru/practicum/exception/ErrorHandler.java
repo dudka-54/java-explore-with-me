@@ -4,7 +4,9 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -23,7 +25,7 @@ public class ErrorHandler {
     public ApiError handleNotFound(NotFoundException e) {
         log.error("Not found: {}", e.getMessage());
         return ApiError.builder()
-                .status(HttpStatus.valueOf(HttpStatus.NOT_FOUND.name()))
+                .status(HttpStatus.NOT_FOUND)
                 .reason("The required object was not found")
                 .message(e.getMessage())
                 .errors(List.of(e.getMessage()))
@@ -36,7 +38,7 @@ public class ErrorHandler {
     public ApiError handleConflict(ConflictException e) {
         log.error("Conflict: {}", e.getMessage());
         return ApiError.builder()
-                .status(HttpStatus.valueOf(HttpStatus.CONFLICT.name()))
+                .status(HttpStatus.CONFLICT)
                 .reason("For the requested operation the conditions are not met")
                 .message(e.getMessage())
                 .errors(List.of(e.getMessage()))
@@ -49,7 +51,7 @@ public class ErrorHandler {
     public ApiError handleValidation(ValidationException e) {
         log.error("Validation error: {}", e.getMessage());
         return ApiError.builder()
-                .status(HttpStatus.valueOf(HttpStatus.BAD_REQUEST.name()))
+                .status(HttpStatus.BAD_REQUEST)
                 .reason("Validation failed")
                 .message(e.getMessage())
                 .errors(List.of(e.getMessage()))
@@ -65,7 +67,7 @@ public class ErrorHandler {
                 .collect(Collectors.toList());
 
         return ApiError.builder()
-                .status(HttpStatus.valueOf(HttpStatus.BAD_REQUEST.name()))
+                .status(HttpStatus.BAD_REQUEST)
                 .reason("Incorrectly made request")
                 .message(String.join("; ", errors))
                 .errors(errors)
@@ -84,7 +86,7 @@ public class ErrorHandler {
 
         log.error("Validation error: {}", message);
         return ApiError.builder()
-                .status(HttpStatus.valueOf(HttpStatus.BAD_REQUEST.name()))
+                .status(HttpStatus.BAD_REQUEST)
                 .reason("Incorrectly made request")
                 .message(message)
                 .errors(errors)
@@ -92,6 +94,18 @@ public class ErrorHandler {
                 .build();
     }
 
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleMissingParams(MissingServletRequestParameterException ex) {
+        return ApiError.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .reason("Incorrectly made request")
+                .message("Required request parameter '" + ex.getParameterName() +
+                        "' for method parameter type " + ex.getParameterType() + " is not present")
+                .errors(List.of(ex.getMessage()))
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -136,6 +150,18 @@ public class ErrorHandler {
                 .reason("Unexpected error occurred")
                 .message("Internal server error")
                 .errors(List.of(e.getMessage()))
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
+        return ApiError.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .reason("Incorrectly made request")
+                .message("Required request body is missing or malformed")
+                .errors(List.of(ex.getMessage()))
                 .timestamp(LocalDateTime.now())
                 .build();
     }

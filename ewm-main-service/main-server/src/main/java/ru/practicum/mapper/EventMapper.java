@@ -17,37 +17,25 @@ import java.util.List;
 )
 public interface EventMapper {
 
-    // ============================================
-    // 1. ENTITY → FULL DTO
-    // ============================================
     @Mapping(target = "category", source = "category")
     @Mapping(target = "initiator", source = "initiator")
     @Mapping(target = "location", source = "location")
     @Mapping(target = "confirmedRequests", source = "confirmedRequests")
-    @Mapping(target = "createdOn", ignore = true)  // ← Устанавливается в сервисе
+    @Mapping(target = "createdOn", ignore = true)
     @Mapping(target = "publishedOn", source = "publishedOn")
     @Mapping(target = "state", source = "state")
-    @Mapping(target = "views", ignore = true)  // ← Из сервиса статистики
+    @Mapping(target = "views", ignore = true)
     EventFullDto toFullDto(Event event);
 
-    // ============================================
-    // 2. ENTITY → SHORT DTO
-    // ============================================
     @Mapping(target = "category", source = "category")
     @Mapping(target = "initiator", source = "initiator")
     @Mapping(target = "confirmedRequests", source = "confirmedRequests")
-    @Mapping(target = "views", ignore = true)  // ← Из сервиса статистики
+    @Mapping(target = "views", ignore = true)
     EventShortDto toShortDto(Event event);
 
-    // ============================================
-    // 3. LIST CONVERSIONS
-    // ============================================
     List<EventShortDto> toShortDtoList(List<Event> events);
     List<EventFullDto> toFullDtoList(List<Event> events);
 
-    // ============================================
-    // 4. NEW EVENT DTO → ENTITY
-    // ============================================
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "category", ignore = true)
     @Mapping(target = "initiator", ignore = true)
@@ -64,9 +52,6 @@ public interface EventMapper {
     @Mapping(target = "title", source = "title")
     Event toEntityFromNew(NewEventDto newEventDto);
 
-    // ============================================
-    // 5. USER UPDATE DTO → ENTITY
-    // ============================================
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "category", ignore = true)
     @Mapping(target = "initiator", ignore = true)
@@ -83,9 +68,6 @@ public interface EventMapper {
     @Mapping(target = "title", source = "title")
     Event toEntityFromUserUpdate(UpdateEventUserRequest updateRequest);
 
-    // ============================================
-    // 6. ADMIN UPDATE DTO → ENTITY
-    // ============================================
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "category", ignore = true)
     @Mapping(target = "initiator", ignore = true)
@@ -102,9 +84,6 @@ public interface EventMapper {
     @Mapping(target = "title", source = "title")
     Event toEntityFromAdminUpdate(UpdateEventAdminRequest updateRequest);
 
-    // ============================================
-    // 7. DEFAULT METHODS FOR PARTIAL UPDATE
-    // ============================================
 
     default void updateEventFromUserRequest(UpdateEventUserRequest request, Event event) {
         if (request.getAnnotation() != null) {
@@ -131,7 +110,6 @@ public interface EventMapper {
         if (request.getTitle() != null) {
             event.setTitle(request.getTitle());
         }
-        // stateAction обрабатывается в сервисе
     }
 
     default void updateEventFromAdminRequest(UpdateEventAdminRequest request, Event event) {
@@ -159,7 +137,6 @@ public interface EventMapper {
         if (request.getTitle() != null) {
             event.setTitle(request.getTitle());
         }
-        // stateAction обрабатывается в сервисе
     }
 
     default EventStatus defaultPendingState() {

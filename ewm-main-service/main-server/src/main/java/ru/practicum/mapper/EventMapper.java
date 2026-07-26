@@ -34,6 +34,7 @@ public interface EventMapper {
     EventShortDto toShortDto(Event event);
 
     List<EventShortDto> toShortDtoList(List<Event> events);
+
     List<EventFullDto> toFullDtoList(List<Event> events);
 
     @Mapping(target = "id", ignore = true)

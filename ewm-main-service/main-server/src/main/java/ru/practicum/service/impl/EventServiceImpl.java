@@ -115,17 +115,8 @@ public class EventServiceImpl implements EventService {
             throw new ValidationException("eventDto не может быть null");
         }
 
-        if (eventDto.getEventDate() != null) {
-            validateAdminEventDate(eventDto.getEventDate());
-        }
-
         Event event = findEventOrThrow(eventId);
-
         userIsNotInitiator(event, userId);
-
-        if (eventDto.getEventDate() == null && event.getEventDate() == null) {
-            throw new ConflictException("Для публикации события необходимо указать дату проведения");
-        }
 
         if (event.getState() == EventStatus.PUBLISHED) {
             log.warn("Попытка обновления опубликованного события: eventId={}", eventId);
@@ -169,6 +160,9 @@ public class EventServiceImpl implements EventService {
         }
 
         if (eventDto.getParticipantLimit() != null) {
+            if (eventDto.getParticipantLimit() < 0) {
+                throw new ValidationException("Лимит участников не может быть отрицательным");
+            }
             event.setParticipantLimit(eventDto.getParticipantLimit());
         }
 
@@ -250,9 +244,7 @@ public class EventServiceImpl implements EventService {
             throw new ValidationException("Список ID запросов не может быть пустым");
         }
 
-
         Event event = findEventOrThrow(eventId);
-
         User user = findUserOrThrow(userId);
 
         userIsNotInitiator(event, userId);
@@ -261,8 +253,8 @@ public class EventServiceImpl implements EventService {
             throw new ValidationException("Нельзя изменять статус запросов для неопубликованного события");
         }
 
-        int currentConfirmed = event.getConfirmedRequests();
-        int participantLimit = event.getParticipantLimit();
+        int currentConfirmed = event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0;
+        int participantLimit = event.getParticipantLimit() != null ? event.getParticipantLimit() : 0;
 
         if (participantLimit > 0 && currentConfirmed >= participantLimit) {
             throw new ConflictException("Лимит участников исчерпан");
@@ -416,91 +408,38 @@ public class EventServiceImpl implements EventService {
 
         Event event = findEventOrThrow(eventId);
 
-        if (request.getEventDate() != null) {
-            validateAdminEventDate(request.getEventDate());
-        }
-
-        if (request.getEventDate() == null && event.getEventDate() == null) {
-            throw new ConflictException("Для публикации события необходимо указать дату проведения");
-        }
-
-        if (request.getStateAction() == AdminStateAction.PUBLISH_EVENT) {
-            if (event.getState() != EventStatus.PENDING) {
-                log.warn("Попытка публикации события не в статусе PENDING: eventId={}, state={}",
-                        eventId, event.getState());
-                throw new ConflictException(
-                        "Событие можно опубликовать только если оно в состоянии ожидания (PENDING). " +
-                                "Текущий статус: " + event.getState()
-                );
-            }
-        }
-
-        if (request.getStateAction() == AdminStateAction.REJECT_EVENT) {
-            if (event.getState() == EventStatus.PUBLISHED) {
-                log.warn("Попытка отклонения опубликованного события: eventId={}", eventId);
-                throw new ConflictException(
-                        "Нельзя отклонить уже опубликованное событие. Текущий статус: " + event.getState()
-                );
-            }
-        }
-
-        if (request.getEventDate() != null) {
-            LocalDateTime now = LocalDateTime.now();
-            LocalDateTime minEventDate = now.plusHours(1);
-
-            if (request.getEventDate().isBefore(minEventDate)) {
-                throw new ValidationException(
-                        String.format(
-                                "Дата события должна быть не ранее чем за час от текущего момента. " +
-                                        "Текущее время: %s, минимальная дата: %s",
-                                now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
-                                minEventDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                        )
-                );
-            }
-        } else {
-            log.warn("eventDate не может быть null");
-            throw new ConflictException("eventDate не может быть null");
-        }
-
         if (request.getAnnotation() != null) {
             event.setAnnotation(request.getAnnotation());
         }
-
         if (request.getDescription() != null) {
             event.setDescription(request.getDescription());
         }
-
         if (request.getTitle() != null) {
             event.setTitle(request.getTitle());
         }
-
-        if (request.getEventDate() != null) {
-            event.setEventDate(request.getEventDate());
-        }
-
         if (request.getLocation() != null) {
             event.setLocation(request.getLocation());
         }
-
         if (request.getPaid() != null) {
             event.setPaid(request.getPaid());
         }
-
         if (request.getParticipantLimit() != null) {
             event.setParticipantLimit(request.getParticipantLimit());
         }
-
         if (request.getRequestModeration() != null) {
             event.setRequestModeration(request.getRequestModeration());
         }
-
         if (request.getCategory() != null) {
             Category category = categoryRepository.findById(request.getCategory())
                     .orElseThrow(() -> new NotFoundException(
                             "Категория с ID " + request.getCategory() + " не найдена"
                     ));
             event.setCategory(category);
+        }
+
+        if (request.getEventDate() != null) {
+            validateAdminEventDate(request.getEventDate());
+            event.setEventDate(request.getEventDate());
         }
 
         if (request.getStateAction() != null) {
@@ -512,16 +451,11 @@ public class EventServiceImpl implements EventService {
                                         "Текущий статус: " + event.getState()
                         );
                     }
-                    LocalDateTime dateToPublish = request.getEventDate() != null
-                            ? request.getEventDate()
-                            : event.getEventDate();
 
+                    LocalDateTime dateToPublish = event.getEventDate();
                     if (dateToPublish == null) {
                         throw new ConflictException("Для публикации события необходимо указать дату проведения");
                     }
-
-                    validateAdminEventDate(dateToPublish);
-                    event.setEventDate(dateToPublish);
 
                     event.setState(EventStatus.PUBLISHED);
                     event.setPublishedOn(LocalDateTime.now());
@@ -529,6 +463,12 @@ public class EventServiceImpl implements EventService {
                     break;
 
                 case REJECT_EVENT:
+                    if (event.getState() == EventStatus.PUBLISHED) {
+                        throw new ConflictException(
+                                "Нельзя отклонить уже опубликованное событие. Текущий статус: " + event.getState()
+                        );
+                    }
+
                     event.setState(EventStatus.CANCELED);
                     log.info("Событие отклонено администратором: eventId={}", eventId);
                     break;

@@ -8,6 +8,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.StatClient;
+import ru.practicum.ViewStats;
 import ru.practicum.dto.event.*;
 import ru.practicum.dto.request.ParticipationRequestDto;
 import ru.practicum.exception.ConflictException;
@@ -41,6 +43,7 @@ public class EventServiceImpl implements EventService {
     private final CategoryRepository categoryRepository;
     private final RequestRepository requestRepository;
     private final RequestMapper requestMapper;
+    private final StatClient statClient;
 
     @Override
     public List<EventShortDto> getEvents(Long userId, Integer from, Integer size) {
@@ -574,17 +577,15 @@ public class EventServiceImpl implements EventService {
             );
         }
 
-        Integer newViews = (event.getViews() != null ? event.getViews() : 0) + 1;
-        event.setViews(newViews);
-        eventRepository.save(event);
-
         EventFullDto dto = eventMapper.toFullDto(event);
+
+        dto.setViews(getEventViews(id));
 
         if (dto.getConfirmedRequests() == null) {
             dto.setConfirmedRequests(0L);
         }
 
-        log.info("Публичное событие получено: id={}, views={}", id, newViews);
+        log.info("Публичное событие получено: id={}, views={}", id, dto.getViews());
         return dto;
     }
 
@@ -663,6 +664,21 @@ public class EventServiceImpl implements EventService {
                             minEventDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                     )
             );
+        }
+    }
+
+    private Long getEventViews(Long eventId) {
+        try {
+            List<ViewStats> stats = statClient.getStats(
+                    LocalDateTime.now().minusYears(100),
+                    LocalDateTime.now(),
+                    List.of("/events/" + eventId),
+                    true
+            );
+            return stats.isEmpty() ? 0L : stats.getFirst().getHits();
+        } catch (Exception e) {
+            log.warn("Не удалось получить статистику просмотров для события id={}: {}", eventId, e.getMessage());
+            return 0L;
         }
     }
 }

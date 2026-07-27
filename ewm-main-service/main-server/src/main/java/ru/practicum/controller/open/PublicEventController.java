@@ -67,8 +67,6 @@ public class PublicEventController implements StatsMainSaver {
                 size
         );
 
-        return events.isEmpty()
-                ? ResponseEntity.noContent().build()
-                : ResponseEntity.ok(events);
+        return ResponseEntity.ok(events);
     }
 }

@@ -115,9 +115,17 @@ public class EventServiceImpl implements EventService {
             throw new ValidationException("eventDto не может быть null");
         }
 
+        if (eventDto.getEventDate() != null) {
+            validateAdminEventDate(eventDto.getEventDate());
+        }
+
         Event event = findEventOrThrow(eventId);
 
         userIsNotInitiator(event, userId);
+
+        if (eventDto.getEventDate() == null && event.getEventDate() == null) {
+            throw new ConflictException("Для публикации события необходимо указать дату проведения");
+        }
 
         if (event.getState() == EventStatus.PUBLISHED) {
             log.warn("Попытка обновления опубликованного события: eventId={}", eventId);
@@ -172,7 +180,8 @@ public class EventServiceImpl implements EventService {
             switch (eventDto.getStateAction()) {
                 case SEND_TO_REVIEW:
                     if (event.getState() == EventStatus.PENDING) {
-                        throw new ValidationException("Событие уже на модерации");
+                        log.info("Событие уже на модерации: eventId={}", eventId);
+                        break;
                     }
                     if (event.getState() == EventStatus.CANCELED) {
                         throw new ValidationException("Нельзя отправить отмененное событие на модерацию");
@@ -240,6 +249,7 @@ public class EventServiceImpl implements EventService {
         if (updateRequest.getRequestIds() == null || updateRequest.getRequestIds().isEmpty()) {
             throw new ValidationException("Список ID запросов не может быть пустым");
         }
+
 
         Event event = findEventOrThrow(eventId);
 
@@ -406,6 +416,14 @@ public class EventServiceImpl implements EventService {
 
         Event event = findEventOrThrow(eventId);
 
+        if (request.getEventDate() != null) {
+            validateAdminEventDate(request.getEventDate());
+        }
+
+        if (request.getEventDate() == null && event.getEventDate() == null) {
+            throw new ConflictException("Для публикации события необходимо указать дату проведения");
+        }
+
         if (request.getStateAction() == AdminStateAction.PUBLISH_EVENT) {
             if (event.getState() != EventStatus.PENDING) {
                 log.warn("Попытка публикации события не в статусе PENDING: eventId={}, state={}",
@@ -431,7 +449,7 @@ public class EventServiceImpl implements EventService {
             LocalDateTime minEventDate = now.plusHours(1);
 
             if (request.getEventDate().isBefore(minEventDate)) {
-                throw new ConflictException(
+                throw new ValidationException(
                         String.format(
                                 "Дата события должна быть не ранее чем за час от текущего момента. " +
                                         "Текущее время: %s, минимальная дата: %s",
@@ -488,6 +506,23 @@ public class EventServiceImpl implements EventService {
         if (request.getStateAction() != null) {
             switch (request.getStateAction()) {
                 case PUBLISH_EVENT:
+                    if (event.getState() != EventStatus.PENDING) {
+                        throw new ConflictException(
+                                "Событие можно опубликовать только если оно в состоянии ожидания (PENDING). " +
+                                        "Текущий статус: " + event.getState()
+                        );
+                    }
+                    LocalDateTime dateToPublish = request.getEventDate() != null
+                            ? request.getEventDate()
+                            : event.getEventDate();
+
+                    if (dateToPublish == null) {
+                        throw new ConflictException("Для публикации события необходимо указать дату проведения");
+                    }
+
+                    validateAdminEventDate(dateToPublish);
+                    event.setEventDate(dateToPublish);
+
                     event.setState(EventStatus.PUBLISHED);
                     event.setPublishedOn(LocalDateTime.now());
                     log.info("Событие опубликовано администратором: eventId={}", eventId);
@@ -580,19 +615,23 @@ public class EventServiceImpl implements EventService {
 
     @Override
     public EventFullDto getPublicEvent(Long id) {
-        log.info("Получение публичного ивента по id={}", id);
+        log.info("Получение публичного события по id={}", id);
         if (id == null) {
             throw new ValidationException("Параметр id не может быть null");
         }
 
         Event event = findEventOrThrow(id);
 
-        if (event.getViews() == null || event.getConfirmedRequests() == null) {
-            throw new ValidationException("views и подтвержденные запросы не должны быть null");
+        if (event.getState() != EventStatus.PUBLISHED) {
+            log.warn("Попытка получения неопубликованного события: id={}, state={}", id, event.getState());
+            throw new NotFoundException(
+                    String.format("Событие с id=%d не найдено или недоступно", id)
+            );
         }
 
-        if (event.getState() != EventStatus.PUBLISHED) {
-            throw new ConflictException("Событие должно быть опубликовано");
+        if (event.getViews() == null || event.getConfirmedRequests() == null) {
+            log.warn("У события отсутствуют views или confirmedRequests: id={}", id);
+            throw new ValidationException("views и подтвержденные запросы не должны быть null");
         }
 
         return eventMapper.toFullDto(event);
@@ -654,5 +693,25 @@ public class EventServiceImpl implements EventService {
                     log.warn("Категория не найдена: id={}", categoryId);
                     return new NotFoundException("Категория с ID " + categoryId + " не найдена");
                 });
+    }
+
+    private void validateAdminEventDate(LocalDateTime eventDate) {
+        if (eventDate == null) {
+            throw new ValidationException("Дата события не может быть null");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime minEventDate = now.plusHours(1);
+
+        if (eventDate.isBefore(minEventDate)) {
+            throw new ConflictException(
+                    String.format(
+                            "Дата события должна быть не ранее чем за час от текущего момента. " +
+                                    "Текущее время: %s, минимальная дата: %s",
+                            now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                            minEventDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                    )
+            );
+        }
     }
 }

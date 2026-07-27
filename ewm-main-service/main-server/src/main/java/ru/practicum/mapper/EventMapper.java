@@ -24,10 +24,10 @@ public interface EventMapper {
     @Mapping(target = "createdOn", ignore = true)
     @Mapping(target = "publishedOn", source = "publishedOn")
     @Mapping(target = "state", source = "state")
-    @Mapping(target = "views", defaultValue = "0L")
+    @Mapping(target = "views", expression = "java(event.getViews() != null ? event.getViews() + 1 : 1)")
     EventFullDto toFullDto(Event event);
 
-    @Mapping(target = "category", source = "category")
+    @Mapping(target = "category", source = "category.id")
     @Mapping(target = "initiator", source = "initiator")
     @Mapping(target = "confirmedRequests", source = "confirmedRequests")
     @Mapping(target = "views", ignore = true)

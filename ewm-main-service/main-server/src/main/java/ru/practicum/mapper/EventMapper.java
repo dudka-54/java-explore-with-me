@@ -17,14 +17,14 @@ import java.util.List;
 )
 public interface EventMapper {
 
-    @Mapping(target = "category", source = "category")
+    @Mapping(target = "category", source = "category.id")
     @Mapping(target = "initiator", source = "initiator")
     @Mapping(target = "location", source = "location")
     @Mapping(target = "confirmedRequests", source = "confirmedRequests")
     @Mapping(target = "createdOn", ignore = true)
     @Mapping(target = "publishedOn", source = "publishedOn")
     @Mapping(target = "state", source = "state")
-    @Mapping(target = "views", ignore = true)
+    @Mapping(target = "views", defaultValue = "0")
     EventFullDto toFullDto(Event event);
 
     @Mapping(target = "category", source = "category")

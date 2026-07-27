@@ -45,7 +45,7 @@ public class RequestServiceImpl implements RequestService {
         Event event = findEventOrThrow(eventId);
 
         if (event.getState() != EventStatus.PUBLISHED) {
-            throw new ValidationException("Нельзя подать заявку на неопубликованное событие");
+            throw new ConflictException("Нельзя подать заявку на неопубликованное событие");
         }
 
         if (event.getInitiator().getId().equals(userId)) {

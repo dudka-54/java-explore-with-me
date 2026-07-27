@@ -119,7 +119,7 @@ public class EventServiceImpl implements EventService {
 
         if (event.getState() == EventStatus.PUBLISHED) {
             log.warn("Попытка обновления опубликованного события: eventId={}", eventId);
-            throw new ValidationException("Нельзя редактировать опубликованное событие");
+            throw new ConflictException("Нельзя редактировать опубликованное событие");
         }
 
         if (eventDto.getEventDate() != null) {
@@ -176,9 +176,7 @@ public class EventServiceImpl implements EventService {
                         log.info("Событие уже на модерации: eventId={}", eventId);
                         break;
                     }
-                    if (event.getState() == EventStatus.CANCELED) {
-                        throw new ValidationException("Нельзя отправить отмененное событие на модерацию");
-                    }
+
                     event.setState(EventStatus.PENDING);
                     log.info("Событие отправлено на модерацию: eventId={}", eventId);
                     break;
@@ -552,6 +550,7 @@ public class EventServiceImpl implements EventService {
         return eventDtos;
     }
 
+    @Transactional(readOnly = true)
     @Override
     public EventFullDto getPublicEvent(Long id) {
         log.info("Получение публичного события по id={}", id);
@@ -568,12 +567,16 @@ public class EventServiceImpl implements EventService {
             );
         }
 
-        if (event.getViews() == null || event.getConfirmedRequests() == null) {
-            log.warn("У события отсутствуют views или confirmedRequests: id={}", id);
-            throw new ValidationException("views и подтвержденные запросы не должны быть null");
+        EventFullDto dto = eventMapper.toFullDto(event);
+
+        if (dto.getViews() == null) {
+            dto.setViews(0L);
+        }
+        if (dto.getConfirmedRequests() == null) {
+            dto.setConfirmedRequests(0L);
         }
 
-        return eventMapper.toFullDto(event);
+        return dto;
     }
 
     private void userIsNotInitiator(Event event, Long userId) {
@@ -599,7 +602,7 @@ public class EventServiceImpl implements EventService {
             String formattedNow = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             String formattedMin = minEventDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
-            throw new ConflictException(
+            throw new ValidationException(
                     String.format(
                             "Дата и время события должны быть не раньше чем через 2 часа от текущего момента. " +
                                     "Текущее время: %s, минимальная дата: %s",
@@ -643,7 +646,7 @@ public class EventServiceImpl implements EventService {
         LocalDateTime minEventDate = now.plusHours(1);
 
         if (eventDate.isBefore(minEventDate)) {
-            throw new ConflictException(
+            throw new ValidationException(
                     String.format(
                             "Дата события должна быть не ранее чем за час от текущего момента. " +
                                     "Текущее время: %s, минимальная дата: %s",

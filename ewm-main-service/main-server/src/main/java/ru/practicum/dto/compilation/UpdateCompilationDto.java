@@ -1,5 +1,6 @@
 package ru.practicum.dto.compilation;
 
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,5 +17,6 @@ public class UpdateCompilationDto {
 
     private Boolean pinned;
 
+    @Size(max = 50, message = "Название подборки не может быть длиннее 50 символов")
     private String title;
 }

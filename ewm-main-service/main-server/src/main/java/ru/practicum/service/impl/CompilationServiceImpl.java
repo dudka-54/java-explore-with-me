@@ -95,10 +95,10 @@ public class CompilationServiceImpl implements CompilationService {
         }
 
         List<Event> events = new ArrayList<>();
-        if (newCompilationDto.getEventsId() != null && !newCompilationDto.getEventsId().isEmpty()) {
-            events = eventRepository.findAllById(newCompilationDto.getEventsId());
+        if (newCompilationDto.getEvents() != null && !newCompilationDto.getEvents().isEmpty()) {
+            events = eventRepository.findAllById(newCompilationDto.getEvents());
 
-            if (events.size() != newCompilationDto.getEventsId().size()) {
+            if (events.size() != newCompilationDto.getEvents().size()) {
                 throw new ValidationException("Некоторые события не найдены");
             }
         }

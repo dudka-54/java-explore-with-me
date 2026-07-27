@@ -35,11 +35,9 @@ public class UserAdminController implements StatsMainSaver {
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public ResponseEntity<UserDto> createUser(@Valid @RequestBody NewUserRequest userDto,
-                              HttpServletRequest request) {
-        saveStat(uri, request);
-        return ResponseEntity.ok(userService.createUser(userDto));
+    public ResponseEntity<UserDto> createUser(@Valid @RequestBody NewUserRequest newUser) {
+        UserDto createdUser = userService.createUser(newUser);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdUser);
     }
 
     @DeleteMapping("/{userId}")

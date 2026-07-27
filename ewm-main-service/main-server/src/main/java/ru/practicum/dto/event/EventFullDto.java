@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class EventFullDto {
     private String annotation;
-    private CategoryDto category;
+    private Long category;
     private Long confirmedRequests;
     private LocalDateTime createdOn;
     private String description;

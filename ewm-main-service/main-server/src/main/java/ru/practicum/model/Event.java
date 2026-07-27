@@ -64,6 +64,7 @@ public class Event {
     @Column(nullable = false, length = 512)
     private String title;
 
-    @Transient
-    private Integer views;
+    @Column(name = "views", nullable = false)
+    @Builder.Default
+    private Integer views = 0;
 }

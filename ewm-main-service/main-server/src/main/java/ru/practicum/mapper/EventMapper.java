@@ -24,7 +24,7 @@ public interface EventMapper {
     @Mapping(target = "createdOn", ignore = true)
     @Mapping(target = "publishedOn", source = "publishedOn")
     @Mapping(target = "state", source = "state")
-    @Mapping(target = "views", expression = "java(event.getViews() != null ? event.getViews() + 1 : 1)")
+    @Mapping(target = "views", ignore = true)
     EventFullDto toFullDto(Event event);
 
     @Mapping(target = "category", source = "category.id")

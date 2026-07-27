@@ -389,7 +389,11 @@ public class EventServiceImpl implements EventService {
         }
 
         List<EventFullDto> eventDtos = eventPage.getContent().stream()
-                .map(eventMapper::toFullDto)
+                .map(event -> {
+                    EventFullDto dto = eventMapper.toFullDto(event);
+                    dto.setViews(event.getViews());
+                    return dto;
+                })
                 .collect(Collectors.toList());
 
         log.info("Найдено {} событий", eventDtos.size());
@@ -543,14 +547,17 @@ public class EventServiceImpl implements EventService {
         }
 
         List<EventShortDto> eventDtos = eventPage.getContent().stream()
-                .map(eventMapper::toShortDto)
+                .map(event -> {
+                    EventShortDto dto = eventMapper.toShortDto(event);
+                    dto.setViews(event.getViews());
+                    return dto;
+                })
                 .collect(Collectors.toList());
 
         log.info("Найдено {} публичных событий", eventDtos.size());
         return eventDtos;
     }
 
-    @Transactional(readOnly = true)
     @Override
     public EventFullDto getPublicEvent(Long id) {
         log.info("Получение публичного события по id={}", id);
@@ -567,15 +574,17 @@ public class EventServiceImpl implements EventService {
             );
         }
 
+        Integer newViews = (event.getViews() != null ? event.getViews() : 0) + 1;
+        event.setViews(newViews);
+        eventRepository.save(event);
+
         EventFullDto dto = eventMapper.toFullDto(event);
 
-        if (dto.getViews() == null) {
-            dto.setViews(0L);
-        }
         if (dto.getConfirmedRequests() == null) {
             dto.setConfirmedRequests(0L);
         }
 
+        log.info("Публичное событие получено: id={}, views={}", id, newViews);
         return dto;
     }
 

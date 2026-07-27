@@ -10,8 +10,6 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -69,27 +67,25 @@ public class StatClient {
             boolean unique
     ) {
         try {
-            String encodedStart = URLEncoder.encode(
-                    start.format(DATE_TIME_FORMATTER),
-                    StandardCharsets.UTF_8
-            );
-            String encodedEnd = URLEncoder.encode(
-                    end.format(DATE_TIME_FORMATTER),
-                    StandardCharsets.UTF_8
-            );
+            log.info(" StatClient.getStats() вызван");
+
+            String startStr = start.format(DATE_TIME_FORMATTER);
+            String endStr = end.format(DATE_TIME_FORMATTER);
 
             UriComponentsBuilder builder = UriComponentsBuilder
                     .fromHttpUrl(statsServerUrl + "/stats")
-                    .queryParam("start", encodedStart)
-                    .queryParam("end", encodedEnd)
+                    .queryParam("start", startStr)
+                    .queryParam("end", endStr)
                     .queryParam("unique", unique);
 
             if (uris != null && !uris.isEmpty()) {
-                builder.queryParam("uris", String.join(",", uris));
+                for (String uri : uris) {
+                    builder.queryParam("uris", uri);
+                }
             }
 
             String url = builder.build().toUriString();
-            log.info("🔍 Requesting stats: {}", url);
+            log.info(" STATCLIENT URL: {}", url);
 
             ResponseEntity<List<ViewStats>> response = rest.exchange(
                     url,
@@ -98,16 +94,12 @@ public class StatClient {
                     VIEW_STATS_LIST_TYPE
             );
 
-            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-                log.error("Failed to get stats. Status: {}", response.getStatusCode());
-                throw new StatsClientException("Failed to get stats: " + response.getStatusCode());
-            }
 
-            log.info("Stats received: {} records", response.getBody().size());
+
             return response.getBody();
 
-        } catch (RestClientException e) {
-            log.error("Error getting stats: {}", e.getMessage(), e);
+        } catch (Exception e) {
+            log.error(" Ошибка в StatClient: {}", e.getMessage(), e);
             throw new StatsClientException("Error getting stats", e);
         }
     }

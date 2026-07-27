@@ -688,7 +688,7 @@ public class EventServiceImpl implements EventService {
                     LocalDateTime.now().minusYears(100),
                     LocalDateTime.now(),
                     List.of("/events/" + eventId),
-                    false
+                    true
             );
             return stats.isEmpty() ? 0L : stats.get(0).getHits();
         } catch (Exception e) {

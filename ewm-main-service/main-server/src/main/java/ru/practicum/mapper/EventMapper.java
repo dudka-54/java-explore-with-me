@@ -40,7 +40,7 @@ public interface EventMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "category", ignore = true)
     @Mapping(target = "initiator", ignore = true)
-    @Mapping(target = "confirmedRequests", ignore = true)
+    @Mapping(target = "confirmedRequests", constant = "0")
     @Mapping(target = "publishedOn", ignore = true)
     @Mapping(target = "state", expression = "java(defaultPendingState())")
     @Mapping(target = "requestModeration", source = "requestModeration")

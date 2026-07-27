@@ -21,7 +21,8 @@ public class Event {
     private Category category;
 
     @Column(nullable = false, name = "confirmed_requests")
-    private Integer confirmedRequests;
+    @Builder.Default
+    private Integer confirmedRequests = 0;
 
     @Column(nullable = false, unique = true)
     private String description;

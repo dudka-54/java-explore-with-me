@@ -683,17 +683,23 @@ public class EventServiceImpl implements EventService {
     }
 
     private Long getEventViews(Long eventId) {
-        try {
-            List<ViewStats> stats = statClient.getStats(
-                    LocalDateTime.now().minusYears(100),
-                    LocalDateTime.now(),
-                    List.of("/events/" + eventId),
-                    false
-            );
-            return stats.isEmpty() ? 0L : stats.get(0).getHits();
-        } catch (Exception e) {
-            log.warn("Не удалось получить статистику просмотров для события id={}: {}", eventId, e.getMessage());
-            return 0L;
-        }
+        // TODO: Убрать заглушку после отладки
+        log.info("🔍 ВРЕМЕННАЯ ЗАГЛУШКА: возвращаю views=5 для eventId={}", eventId);
+        return 5L;
+
+    /* Оригинальный код (закомментирован для отладки)
+    try {
+        List<ViewStats> stats = statClient.getStats(
+                LocalDateTime.now().minusYears(100),
+                LocalDateTime.now(),
+                List.of("/events/" + eventId),
+                false
+        );
+        return stats.isEmpty() ? 0L : stats.get(0).getHits();
+    } catch (Exception e) {
+        log.warn("Не удалось получить статистику просмотров для события id={}: {}", eventId, e.getMessage());
+        return 0L;
+    }
+    */
     }
 }

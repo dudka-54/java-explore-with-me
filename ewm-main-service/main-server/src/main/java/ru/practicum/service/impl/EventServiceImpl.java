@@ -51,10 +51,18 @@ public class EventServiceImpl implements EventService {
 
         Pageable pageable = PageRequest.of(from / size, size);
         Page<Event> eventPage = eventRepository.findEventsByInitiatorId(userId, pageable);
+
         if (!(eventPage.hasContent())) {
             return List.of();
         }
-        return eventMapper.toShortDtoList(eventPage.getContent());
+
+        return eventPage.getContent().stream()
+                .map(event -> {
+                    EventShortDto dto = eventMapper.toShortDto(event);
+                    dto.setViews(getEventViews(event.getId()));  // ← ДОБАВЛЕНО!
+                    return dto;
+                })
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -76,7 +84,10 @@ public class EventServiceImpl implements EventService {
 
         Event savedEvent = eventRepository.save(event);
 
-        return eventMapper.toFullDto(savedEvent);
+        EventFullDto dto = eventMapper.toFullDto(savedEvent);
+        dto.setViews(0L);
+
+        return dto;
     }
 
     @Override
@@ -94,6 +105,8 @@ public class EventServiceImpl implements EventService {
         userIsNotInitiator(event, userId);
 
         EventFullDto eventDto = eventMapper.toFullDto(event);
+
+        eventDto.setViews(getEventViews(eventId));
 
         log.info("Событие найдено: id={}, title={}, userId={}",
                 eventId, event.getTitle(), userId);
@@ -394,7 +407,7 @@ public class EventServiceImpl implements EventService {
         List<EventFullDto> eventDtos = eventPage.getContent().stream()
                 .map(event -> {
                     EventFullDto dto = eventMapper.toFullDto(event);
-                    dto.setViews(event.getViews());
+                    dto.setViews(getEventViews(event.getId()));
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -483,9 +496,11 @@ public class EventServiceImpl implements EventService {
         }
 
         Event updatedEvent = eventRepository.save(event);
-        log.info("Событие обновлено администратором: eventId={}", eventId);
+        EventFullDto dto = eventMapper.toFullDto(updatedEvent);
+        dto.setViews(getEventViews(eventId));
 
-        return eventMapper.toFullDto(updatedEvent);
+        log.info("Событие обновлено администратором: eventId={}", eventId);
+        return dto;
     }
 
 

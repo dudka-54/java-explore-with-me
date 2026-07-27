@@ -552,7 +552,7 @@ public class EventServiceImpl implements EventService {
         List<EventShortDto> eventDtos = eventPage.getContent().stream()
                 .map(event -> {
                     EventShortDto dto = eventMapper.toShortDto(event);
-                    dto.setViews(event.getViews());
+                    dto.setViews(getEventViews(event.getId()));
                     return dto;
                 })
                 .collect(Collectors.toList());

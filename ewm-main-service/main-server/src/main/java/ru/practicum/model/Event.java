@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "events")
 public class Event {
-    @Column(nullable = false, length = 2000)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String annotation;
 
     @ManyToOne(fetch = FetchType.LAZY)

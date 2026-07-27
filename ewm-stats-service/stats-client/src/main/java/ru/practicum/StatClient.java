@@ -85,13 +85,11 @@ public class StatClient {
                     .queryParam("unique", unique);
 
             if (uris != null && !uris.isEmpty()) {
-                for (String uri : uris) {
-                    builder.queryParam("uris", uri);
-                }
+                builder.queryParam("uris", String.join(",", uris));
             }
 
             String url = builder.build().toUriString();
-            log.debug("Requesting stats: {}", url);
+            log.info("🔍 Requesting stats: {}", url);
 
             ResponseEntity<List<ViewStats>> response = rest.exchange(
                     url,

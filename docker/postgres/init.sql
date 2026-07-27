@@ -1,6 +1,4 @@
-
 CREATE DATABASE main;
-
 \c main;
 
 DROP TABLE IF EXISTS compilation_events CASCADE;

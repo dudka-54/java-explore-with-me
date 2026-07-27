@@ -36,11 +36,7 @@ public class PublicEventController implements StatsMainSaver {
     ) {
         saveStat("/events", request, String.valueOf(id));
 
-        // 2. Получаем событие из сервиса
         EventFullDto event = eventService.getPublicEvent(id);
-
-        // 3. Устанавливаем views через интерфейс
-        event.setViews(getEventViews(id));
 
         return ResponseEntity.ok(event);
     }
@@ -63,11 +59,6 @@ public class PublicEventController implements StatsMainSaver {
         List<EventShortDto> events = eventService.getPublicEvents(
                 text, categories, paid, rangeStart, rangeEnd,
                 onlyAvailable, sort, from, size
-        );
-
-        // ✅ Устанавливаем views для каждого события
-        events.forEach(event ->
-                event.setViews(getEventViews(event.getId()))
         );
 
         return ResponseEntity.ok(events);

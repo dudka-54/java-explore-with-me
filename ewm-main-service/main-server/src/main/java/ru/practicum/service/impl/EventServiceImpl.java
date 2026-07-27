@@ -59,7 +59,7 @@ public class EventServiceImpl implements EventService {
         return eventPage.getContent().stream()
                 .map(event -> {
                     EventShortDto dto = eventMapper.toShortDto(event);
-                    dto.setViews(getEventViews(event.getId()));  // ← ДОБАВЛЕНО!
+                    dto.setViews(getEventViews(event.getId()));
                     return dto;
                 })
                 .collect(Collectors.toList());

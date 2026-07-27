@@ -671,7 +671,7 @@ public class EventServiceImpl implements EventService {
         try {
             List<ViewStats> stats = statClient.getStats(
                     LocalDateTime.now().minusYears(100),
-                    LocalDateTime.now(),
+                    LocalDateTime.now().plusYears(100),
                     List.of("/events/" + eventId),
                     true
             );

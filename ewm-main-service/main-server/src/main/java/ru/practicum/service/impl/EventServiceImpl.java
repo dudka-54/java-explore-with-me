@@ -6,10 +6,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 import ru.practicum.StatClient;
 import ru.practicum.ViewStats;
 import ru.practicum.dto.event.*;
@@ -686,13 +684,15 @@ public class EventServiceImpl implements EventService {
 
     private Long getEventViews(Long eventId) {
         try {
-            RestTemplate rest = new RestTemplate();
-            String url = "http://localhost:9090/stats?start=2026-07-27%2010:00:00&end=2026-07-27%2023:59:59&uris=/events/" + eventId + "&unique=false";
-            ResponseEntity<ViewStats[]> response = rest.getForEntity(url, ViewStats[].class);
-            ViewStats[] stats = response.getBody();
-            return stats != null && stats.length > 0 ? stats[0].getHits() : 0L;
+            List<ViewStats> stats = statClient.getStats(
+                    LocalDateTime.now().minusYears(100),
+                    LocalDateTime.now(),
+                    List.of("/events/" + eventId),
+                    false
+            );
+            return stats.isEmpty() ? 0L : stats.get(0).getHits();
         } catch (Exception e) {
-            log.error("Ошибка: {}", e.getMessage());
+            log.warn("Не удалось получить статистику просмотров для события id={}: {}", eventId, e.getMessage());
             return 0L;
         }
     }

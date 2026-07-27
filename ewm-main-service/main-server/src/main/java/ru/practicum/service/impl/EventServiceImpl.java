@@ -675,7 +675,7 @@ public class EventServiceImpl implements EventService {
                     List.of("/events/" + eventId),
                     false
             );
-            return stats.isEmpty() ? 0L : stats.getFirst().getHits();
+            return stats.isEmpty() ? 0L : stats.get(0).getHits();
         } catch (Exception e) {
             log.warn("Не удалось получить статистику просмотров для события id={}: {}", eventId, e.getMessage());
             return 0L;

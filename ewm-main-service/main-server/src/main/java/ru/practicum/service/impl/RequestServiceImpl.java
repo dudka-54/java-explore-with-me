@@ -100,14 +100,6 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     public ParticipationRequestDto cancelRequest(Long userId, Long requestId) {
         log.info("Отмена запроса: userId={}, requestId={}", userId, requestId);
-
-        if (userId == null) {
-            throw new ValidationException("userId не может быть null");
-        }
-        if (requestId == null) {
-            throw new ValidationException("requestId не может быть null");
-        }
-
         findUserOrThrow(userId);
 
         Request request = findRequestOrThrow(requestId);

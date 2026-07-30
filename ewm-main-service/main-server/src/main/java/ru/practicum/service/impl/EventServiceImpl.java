@@ -1,0 +1,699 @@
+package ru.practicum.service.impl;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.StatClient;
+import ru.practicum.ViewStats;
+import ru.practicum.dto.event.*;
+import ru.practicum.dto.request.ParticipationRequestDto;
+import ru.practicum.exception.ConflictException;
+import ru.practicum.exception.NotFoundException;
+import ru.practicum.exception.ValidationException;
+import ru.practicum.mapper.EventMapper;
+import ru.practicum.mapper.RequestMapper;
+import ru.practicum.model.*;
+import ru.practicum.repository.CategoryRepository;
+import ru.practicum.repository.EventRepository;
+import ru.practicum.repository.RequestRepository;
+import ru.practicum.repository.UserRepository;
+import ru.practicum.service.EventService;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional(readOnly = true)
+public class EventServiceImpl implements EventService {
+
+    private final EventRepository eventRepository;
+    private final EventMapper eventMapper;
+    private final UserRepository userRepository;
+    private final CategoryRepository categoryRepository;
+    private final RequestRepository requestRepository;
+    private final RequestMapper requestMapper;
+    private final StatClient statClient;
+
+    @Override
+    public List<EventShortDto> getEvents(Long userId, Integer from, Integer size) {
+        log.info("Приватный запрос на получение событий по userId - {}, from - {}, size-{}", userId, from, size);
+
+        Pageable pageable = PageRequest.of(from / size, size);
+        Page<Event> eventPage = eventRepository.findEventsByInitiatorId(userId, pageable);
+
+        if (!(eventPage.hasContent())) {
+            return List.of();
+        }
+
+        return eventPage.getContent().stream()
+                .map(event -> {
+                    EventShortDto dto = eventMapper.toShortDto(event);
+                    dto.setViews(getEventViews(event.getId()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public EventFullDto saveEvent(Long userId, NewEventDto newEventDto) {
+        log.info("Приватный запрос на создание пользователя, userId={}, newEventDto={}", userId, newEventDto);
+        User initiator = findUserOrThrow(userId);
+
+        Category category = findCategoryOrThrow(newEventDto.getCategory());
+
+        Event event = eventMapper.toEntityFromNew(newEventDto);
+
+        event.setInitiator(initiator);
+        event.setCategory(category);
+
+        if (newEventDto.getEventDate() != null) {
+            validateEventDate(newEventDto.getEventDate());
+        }
+
+        Event savedEvent = eventRepository.save(event);
+
+        EventFullDto dto = eventMapper.toFullDto(savedEvent);
+        dto.setViews(0L);
+
+        return dto;
+    }
+
+    @Override
+    public EventFullDto getEvent(Long userId, Long eventId) {
+        log.info("Запрос на получение события по userId={}, eventId={}", userId, eventId);
+        if (userId == null) {
+            throw new ValidationException("userId не может быть null");
+        }
+        if (eventId == null) {
+            throw new ValidationException("eventId не может быть null");
+        }
+
+        Event event = findEventOrThrow(eventId);
+
+        userIsNotInitiator(event, userId);
+
+        EventFullDto eventDto = eventMapper.toFullDto(event);
+
+        eventDto.setViews(getEventViews(eventId));
+
+        log.info("Событие найдено: id={}, title={}, userId={}",
+                eventId, event.getTitle(), userId);
+
+        return eventDto;
+    }
+
+    @Override
+    @Transactional
+    public EventFullDto patchEvent(Long userId, Long eventId, UpdateEventUserRequest eventDto) {
+        log.info("Запрос на обновление события по userId={}, eventId={}, eventDto={}",
+                userId, eventId, eventDto);
+
+        if (userId == null) {
+            throw new ValidationException("userId не может быть null");
+        }
+        if (eventId == null) {
+            throw new ValidationException("eventId не может быть null");
+        }
+        if (eventDto == null) {
+            throw new ValidationException("eventDto не может быть null");
+        }
+
+        Event event = findEventOrThrow(eventId);
+        userIsNotInitiator(event, userId);
+
+        if (event.getState() == EventStatus.PUBLISHED) {
+            log.warn("Попытка обновления опубликованного события: eventId={}", eventId);
+            throw new ConflictException("Нельзя редактировать опубликованное событие");
+        }
+
+        if (eventDto.getEventDate() != null) {
+            validateEventDate(eventDto.getEventDate());
+        }
+
+        if (eventDto.getAnnotation() != null) {
+            event.setAnnotation(eventDto.getAnnotation());
+        }
+
+        if (eventDto.getDescription() != null) {
+            event.setDescription(eventDto.getDescription());
+        }
+
+        if (eventDto.getTitle() != null) {
+            event.setTitle(eventDto.getTitle());
+        }
+
+        if (eventDto.getEventDate() != null) {
+            event.setEventDate(eventDto.getEventDate());
+        }
+
+        if (eventDto.getCategory() != null) {
+            Category category = categoryRepository.findById(eventDto.getCategory())
+                    .orElseThrow(() -> new NotFoundException(
+                            "Категория с ID " + eventDto.getCategory() + " не найдена"
+                    ));
+            event.setCategory(category);
+        }
+
+        if (eventDto.getLocation() != null) {
+            event.setLocation(eventDto.getLocation());
+        }
+
+        if (eventDto.getPaid() != null) {
+            event.setPaid(eventDto.getPaid());
+        }
+
+        if (eventDto.getParticipantLimit() != null) {
+            if (eventDto.getParticipantLimit() < 0) {
+                throw new ValidationException("Лимит участников не может быть отрицательным");
+            }
+            event.setParticipantLimit(eventDto.getParticipantLimit());
+        }
+
+        if (eventDto.getRequestModeration() != null) {
+            event.setRequestModeration(eventDto.getRequestModeration());
+        }
+
+        if (eventDto.getStateAction() != null) {
+            switch (eventDto.getStateAction()) {
+                case SEND_TO_REVIEW:
+                    if (event.getState() == EventStatus.PENDING) {
+                        log.info("Событие уже на модерации: eventId={}", eventId);
+                        break;
+                    }
+
+                    event.setState(EventStatus.PENDING);
+                    log.info("Событие отправлено на модерацию: eventId={}", eventId);
+                    break;
+
+                case CANCEL_REVIEW:
+                    if (event.getState() != EventStatus.PENDING) {
+                        throw new ValidationException("Событие не на модерации");
+                    }
+                    event.setState(EventStatus.CANCELED);
+                    log.info("Модерация события отменена: eventId={}", eventId);
+                    break;
+
+                default:
+                    throw new ValidationException("Некорректное действие: " + eventDto.getStateAction());
+            }
+        }
+
+        Event updatedEvent = eventRepository.save(event);
+        log.info("Событие обновлено: eventId={}, userId={}", eventId, userId);
+
+        return eventMapper.toFullDto(updatedEvent);
+    }
+
+    @Override
+    public List<ParticipationRequestDto> getRequestEvent(Long userId, Long eventId) {
+        log.info("Получение информации о запросах на участие в событии текущего пользователя" +
+                " по userId={}, eventId={}", userId, eventId);
+
+        if (userId == null) {
+            throw new ValidationException("userId не может быть null");
+        }
+        if (eventId == null) {
+            throw new ValidationException("eventId не может быть null");
+        }
+
+        Event event = findEventOrThrow(eventId);
+
+        User user = findUserOrThrow(userId);
+
+        userIsNotInitiator(event, userId);
+
+        List<Request> requests = requestRepository.findByEventId(eventId);
+        log.info("Найдено {} запросов на участие в событии: eventId={}, eventTitle={}",
+                requests.size(), eventId, event.getTitle());
+
+        return requestMapper.toDtoList(requests);
+    }
+
+    @Override
+    @Transactional
+    public EventRequestStatusUpdateResult patchRequestEvent(Long userId,
+                                                            Long eventId,
+                                                            EventRequestStatusUpdateRequest updateRequest) {
+        log.info("Изменение статуса (подтверждена, отменена) заявок на участие в событии текущего пользователя" +
+                " по userId={}, eventId={}", userId, eventId);
+
+        if (userId == null || eventId == null || updateRequest == null) {
+            throw new ValidationException("Параметры не могут быть null");
+        }
+
+        if (updateRequest.getRequestIds() == null || updateRequest.getRequestIds().isEmpty()) {
+            throw new ValidationException("Список ID запросов не может быть пустым");
+        }
+
+        Event event = findEventOrThrow(eventId);
+        User user = findUserOrThrow(userId);
+
+        userIsNotInitiator(event, userId);
+
+        if (event.getState() != EventStatus.PUBLISHED) {
+            throw new ValidationException("Нельзя изменять статус запросов для неопубликованного события");
+        }
+
+        int currentConfirmed = event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0;
+        int participantLimit = event.getParticipantLimit() != null ? event.getParticipantLimit() : 0;
+
+        if (participantLimit > 0 && currentConfirmed >= participantLimit) {
+            throw new ConflictException("Лимит участников исчерпан");
+        }
+
+        List<Request> pendingRequests = requestRepository.findPendingRequestsByIds(
+                updateRequest.getRequestIds()
+        );
+
+        if (pendingRequests.size() != updateRequest.getRequestIds().size()) {
+            throw new ConflictException("Некоторые запросы не найдены или не имеют статуса PENDING");
+        }
+
+        for (Request request : pendingRequests) {
+            if (!request.getEvent().getId().equals(eventId)) {
+                throw new ValidationException("Запрос ID=" + request.getId() +
+                        " не принадлежит событию ID=" + eventId);
+            }
+        }
+
+        for (Request request : pendingRequests) {
+            if (request.getRequester().getId().equals(userId)) {
+                throw new ConflictException("Инициатор не может подтверждать/отклонять свою заявку");
+            }
+        }
+
+        List<Request> confirmedRequests = new ArrayList<>();
+        List<Request> rejectedRequests = new ArrayList<>();
+
+        if (updateRequest.getStatus() == RequestStatus.CONFIRMED) {
+            int availableSlots = participantLimit > 0 ? participantLimit - currentConfirmed : Integer.MAX_VALUE;
+
+            for (Request request : pendingRequests) {
+                if (availableSlots > 0) {
+                    request.setStatus(RequestStatus.CONFIRMED);
+                    confirmedRequests.add(request);
+                    availableSlots--;
+                    event.setConfirmedRequests(event.getConfirmedRequests() + 1);
+                } else {
+                    request.setStatus(RequestStatus.REJECTED);
+                    rejectedRequests.add(request);
+                }
+            }
+
+            if (participantLimit > 0 && event.getConfirmedRequests() >= participantLimit) {
+                List<Request> remainingPending = requestRepository.findByEventIdAndStatus(
+                        eventId, RequestStatus.PENDING
+                );
+                for (Request request : remainingPending) {
+                    if (!confirmedRequests.contains(request) && !rejectedRequests.contains(request)) {
+                        request.setStatus(RequestStatus.REJECTED);
+                        rejectedRequests.add(request);
+                    }
+                }
+            }
+
+        } else if (updateRequest.getStatus() == RequestStatus.REJECTED) {
+            for (Request request : pendingRequests) {
+                request.setStatus(RequestStatus.REJECTED);
+                rejectedRequests.add(request);
+            }
+        } else {
+            throw new ValidationException("Статус должен быть CONFIRMED или REJECTED");
+        }
+
+        if (!confirmedRequests.isEmpty()) {
+            requestRepository.saveAll(confirmedRequests);
+        }
+        if (!rejectedRequests.isEmpty()) {
+            requestRepository.saveAll(rejectedRequests);
+        }
+        eventRepository.save(event);
+
+        log.info("Статусы запросов обновлены: confirmed={}, rejected={}",
+                confirmedRequests.size(), rejectedRequests.size());
+
+        return EventRequestStatusUpdateResult.builder()
+                .confirmedRequests(requestMapper.toDtoList(confirmedRequests))
+                .rejectedRequests(requestMapper.toDtoList(rejectedRequests))
+                .build();
+    }
+
+    @Override
+    public List<EventFullDto> getAdminEvents(
+            List<Long> users,
+            List<String> states,
+            List<Long> categories,
+            LocalDateTime rangeStart,
+            LocalDateTime rangeEnd,
+            Integer from,
+            Integer size
+    ) {
+        log.info("Поиск событий администратором: users={}, states={}, categories={}, " +
+                        "rangeStart={}, rangeEnd={}, from={}, size={}",
+                users, states, categories, rangeStart, rangeEnd, from, size);
+
+        if (from == null) from = 0;
+        if (size == null) size = 10;
+
+        if (from < 0) {
+            throw new ValidationException("from не может быть отрицательным");
+        }
+        if (size < 1) {
+            throw new ValidationException("size должен быть больше 0");
+        }
+
+        List<EventStatus> statuses = null;
+        if (states != null && !states.isEmpty()) {
+            statuses = states.stream()
+                    .map(state -> {
+                        try {
+                            return EventStatus.valueOf(state.toUpperCase());
+                        } catch (IllegalArgumentException e) {
+                            throw new ValidationException("Некорректный статус: " + state +
+                                    ". Допустимые значения: PENDING, PUBLISHED, CANCELED");
+                        }
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        Pageable pageable = PageRequest.of(from / size, size);
+
+        Page<Event> eventPage = eventRepository.findAdminEvents(
+                users,
+                statuses,
+                categories,
+                rangeStart,
+                rangeEnd,
+                pageable
+        );
+
+        if (eventPage.isEmpty()) {
+            log.info("События не найдены");
+            return Collections.emptyList();
+        }
+
+        List<EventFullDto> eventDtos = eventPage.getContent().stream()
+                .map(event -> {
+                    EventFullDto dto = eventMapper.toFullDto(event);
+                    dto.setViews(getEventViews(event.getId()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        log.info("Найдено {} событий", eventDtos.size());
+        return eventDtos;
+    }
+
+    @Override
+    @Transactional
+    public EventFullDto patchAdminEvent(Long eventId, UpdateEventAdminRequest request) {
+        if (eventId == null || request == null) {
+            throw new ValidationException("Параметры не могут быть null");
+        }
+
+        Event event = findEventOrThrow(eventId);
+
+        if (request.getAnnotation() != null) {
+            event.setAnnotation(request.getAnnotation());
+        }
+        if (request.getDescription() != null) {
+            event.setDescription(request.getDescription());
+        }
+        if (request.getTitle() != null) {
+            event.setTitle(request.getTitle());
+        }
+        if (request.getLocation() != null) {
+            event.setLocation(request.getLocation());
+        }
+        if (request.getPaid() != null) {
+            event.setPaid(request.getPaid());
+        }
+        if (request.getParticipantLimit() != null) {
+            event.setParticipantLimit(request.getParticipantLimit());
+        }
+        if (request.getRequestModeration() != null) {
+            event.setRequestModeration(request.getRequestModeration());
+        }
+        if (request.getCategory() != null) {
+            Category category = categoryRepository.findById(request.getCategory())
+                    .orElseThrow(() -> new NotFoundException(
+                            "Категория с ID " + request.getCategory() + " не найдена"
+                    ));
+            event.setCategory(category);
+        }
+
+        if (request.getEventDate() != null) {
+            validateAdminEventDate(request.getEventDate());
+            event.setEventDate(request.getEventDate());
+        }
+
+        if (request.getStateAction() != null) {
+            switch (request.getStateAction()) {
+                case PUBLISH_EVENT:
+                    if (event.getState() != EventStatus.PENDING) {
+                        throw new ConflictException(
+                                "Событие можно опубликовать только если оно в состоянии ожидания (PENDING). " +
+                                        "Текущий статус: " + event.getState()
+                        );
+                    }
+
+                    LocalDateTime dateToPublish = event.getEventDate();
+                    if (dateToPublish == null) {
+                        throw new ConflictException("Для публикации события необходимо указать дату проведения");
+                    }
+
+                    event.setState(EventStatus.PUBLISHED);
+                    event.setPublishedOn(LocalDateTime.now());
+                    log.info("Событие опубликовано администратором: eventId={}", eventId);
+                    break;
+
+                case REJECT_EVENT:
+                    if (event.getState() == EventStatus.PUBLISHED) {
+                        throw new ConflictException(
+                                "Нельзя отклонить уже опубликованное событие. Текущий статус: " + event.getState()
+                        );
+                    }
+
+                    event.setState(EventStatus.CANCELED);
+                    log.info("Событие отклонено администратором: eventId={}", eventId);
+                    break;
+
+                default:
+                    throw new ValidationException("Некорректное действие: " + request.getStateAction());
+            }
+        }
+
+        Event updatedEvent = eventRepository.save(event);
+        EventFullDto dto = eventMapper.toFullDto(updatedEvent);
+        dto.setViews(getEventViews(eventId));
+
+        log.info("Событие обновлено администратором: eventId={}", eventId);
+        return dto;
+    }
+
+
+    @Override
+    public List<EventShortDto> getPublicEvents(
+            String text,
+            List<Long> categories,
+            Boolean paid,
+            LocalDateTime rangeStart,
+            LocalDateTime rangeEnd,
+            Boolean onlyAvailable,
+            String sort,
+            Integer from,
+            Integer size
+    ) {
+        log.info("Публичный запрос событий: text={}, categories={}, paid={}, rangeStart={}, rangeEnd={}, " +
+                        "onlyAvailable={}, sort={}, from={}, size={}",
+                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size);
+        if (from < 0) {
+            throw new ValidationException("from не может быть отрицательным");
+        }
+        if (size < 1) {
+            throw new ValidationException("size должен быть больше 0");
+        }
+
+        LocalDateTime start = rangeStart;
+        LocalDateTime end = rangeEnd;
+
+        if (start == null) {
+            start = LocalDateTime.now();
+        }
+        if (end == null) {
+            end = LocalDateTime.now().plusYears(100);
+        }
+
+        if (start.isAfter(end)) {
+            throw new ValidationException("rangeStart должен быть раньше rangeEnd");
+        }
+
+        boolean onlyAvailableEvents = onlyAvailable != null && onlyAvailable;
+
+        Sort sortBy = Sort.by("eventDate").ascending();
+        if ("VIEWS".equalsIgnoreCase(sort)) {
+            sortBy = Sort.by("views").descending();
+        }
+
+        Pageable pageable = PageRequest.of(from / size, size, sortBy);
+
+        Page<Event> eventPage = eventRepository.findPublicEvents(
+                text,
+                categories,
+                paid,
+                start,
+                end,
+                onlyAvailableEvents,
+                pageable
+        );
+
+        if (eventPage.isEmpty()) {
+            log.info("Публичные события не найдены");
+            return Collections.emptyList();
+        }
+
+        List<EventShortDto> eventDtos = eventPage.getContent().stream()
+                .map(event -> {
+                    EventShortDto dto = eventMapper.toShortDto(event);
+                    dto.setViews(getEventViews(event.getId()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        log.info("Найдено {} публичных событий", eventDtos.size());
+        return eventDtos;
+    }
+
+    @Override
+    public EventFullDto getPublicEvent(Long id) {
+        log.info("Получение публичного события по id={}", id);
+        if (id == null) {
+            throw new ValidationException("Параметр id не может быть null");
+        }
+
+        Event event = findEventOrThrow(id);
+
+        if (event.getState() != EventStatus.PUBLISHED) {
+            log.warn("Попытка получения неопубликованного события: id={}, state={}", id, event.getState());
+            throw new NotFoundException(
+                    String.format("Событие с id=%d не найдено или недоступно", id)
+            );
+        }
+
+        EventFullDto dto = eventMapper.toFullDto(event);
+
+        dto.setViews(getEventViews(id));
+
+        if (dto.getConfirmedRequests() == null) {
+            dto.setConfirmedRequests(0L);
+        }
+
+        log.info("Публичное событие получено: id={}, views={}", id, dto.getViews());
+        return dto;
+    }
+
+    private void userIsNotInitiator(Event event, Long userId) {
+        if (!event.getInitiator().getId().equals(userId)) {
+            log.warn("Попытка доступа к событию не инициатором: userId={}, eventId={}, initiatorId={}",
+                    userId, event.getId(), event.getInitiator().getId());
+            throw new NotFoundException(
+                    String.format("Событие с id=%d не найдено или недоступно для пользователя id=%d",
+                            event.getId(), userId)
+            );
+        }
+    }
+
+    private void validateEventDate(LocalDateTime eventDate) {
+        if (eventDate == null) {
+            throw new ValidationException("Дата события не может быть null");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime minEventDate = now.plusHours(2);
+
+        if (eventDate.isBefore(minEventDate)) {
+            String formattedNow = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String formattedMin = minEventDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+            throw new ValidationException(
+                    String.format(
+                            "Дата и время события должны быть не раньше чем через 2 часа от текущего момента. " +
+                                    "Текущее время: %s, минимальная дата: %s",
+                            formattedNow, formattedMin
+                    )
+            );
+        }
+    }
+
+    private Event findEventOrThrow(Long id) {
+        return eventRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.warn("Событие не найдено: id={}", id);
+                    return new NotFoundException("Событие с ID " + id + " не найдено");
+                });
+    }
+
+    private User findUserOrThrow(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    log.warn("Пользователь не найден: id={}", userId);
+                    return new NotFoundException("Пользователь с ID " + userId + " не найден");
+                });
+    }
+
+
+    private Category findCategoryOrThrow(Long categoryId) {
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> {
+                    log.warn("Категория не найдена: id={}", categoryId);
+                    return new NotFoundException("Категория с ID " + categoryId + " не найдена");
+                });
+    }
+
+    private void validateAdminEventDate(LocalDateTime eventDate) {
+        if (eventDate == null) {
+            throw new ValidationException("Дата события не может быть null");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime minEventDate = now.plusHours(1);
+
+        if (eventDate.isBefore(minEventDate)) {
+            throw new ValidationException(
+                    String.format(
+                            "Дата события должна быть не ранее чем за час от текущего момента. " +
+                                    "Текущее время: %s, минимальная дата: %s",
+                            now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                            minEventDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                    )
+            );
+        }
+    }
+
+    private Long getEventViews(Long eventId) {
+        try {
+            List<ViewStats> stats = statClient.getStats(
+                    LocalDateTime.now().minusYears(100),
+                    LocalDateTime.now(),
+                    List.of("/events/" + eventId),
+                    true
+            );
+            return stats.isEmpty() ? 0L : stats.get(0).getHits();
+        } catch (Exception e) {
+            log.warn("Не удалось получить статистику просмотров для события id={}: {}", eventId, e.getMessage());
+            return 0L;
+        }
+    }
+}

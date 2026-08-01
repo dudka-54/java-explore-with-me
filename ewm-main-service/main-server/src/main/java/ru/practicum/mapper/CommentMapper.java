@@ -12,23 +12,21 @@ import java.util.List;
 
 @Mapper(
         componentModel = MappingConstants.ComponentModel.SPRING,
-        unmappedTargetPolicy = ReportingPolicy.IGNORE,
-        uses = {CommentMapper.class}
+        unmappedTargetPolicy = ReportingPolicy.IGNORE
 )
 public interface CommentMapper {
 
     @Mapping(target = "event", source = "event.id")
     @Mapping(target = "commentator", source = "commentator.id")
-    @Mapping(target = "status", source = "status")
+    @Mapping(target = "status", expression = "java(comment.getStatus().name())")
     CommentDto toDto(Comment comment);
 
-    @Mapping(target = "commentator", source = "commentator")
+    @Mapping(target = "commentator", source = "commentator.id")
     CommentShortDto toShortDto(Comment comment);
 
     List<CommentDto> toDtoList(List<Comment> comments);
 
     List<CommentShortDto> toShortDtoList(List<Comment> comments);
-
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "event", ignore = true)
@@ -36,7 +34,6 @@ public interface CommentMapper {
     @Mapping(target = "created", ignore = true)
     @Mapping(target = "status", ignore = true)
     Comment toEntity(NewCommentDto dto);
-
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "event", ignore = true)

@@ -130,7 +130,7 @@ public class CommentServiceImpl implements CommentService {
         Event event = findEventOrThrow(eventId);
         User user = findUserOrThrow(userId);
 
-        Comment comment = commentRepository.findByCommentatorIdAndEventIdAndStatus(userId, eventId)
+        Comment comment = commentRepository.findByCommentatorIdAndEventId(userId, eventId)
                 .orElseThrow(() -> new NotFoundException(
                         "Комментарий пользователя " + userId + " к событию " + eventId + " не найден"
                 ));

@@ -12,8 +12,7 @@ import java.util.List;
 
 @Mapper(
         componentModel = MappingConstants.ComponentModel.SPRING,
-        unmappedTargetPolicy = ReportingPolicy.IGNORE,
-        uses = {CommentMapper.class}
+        unmappedTargetPolicy = ReportingPolicy.IGNORE
 )
 public interface CommentMapper {
 

@@ -5,7 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import ru.practicum.model.RequestStatus;
+import ru.practicum.model.CommentStatus;
 
 import java.time.LocalDateTime;
 
@@ -20,6 +20,6 @@ public class CommentDto {
     private LocalDateTime created;
     private Long event;
     private Long commentator;
-    private RequestStatus status;
+    private CommentStatus status;
     private String text;
 }

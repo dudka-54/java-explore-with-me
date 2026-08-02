@@ -53,7 +53,6 @@ public class CommentServiceImpl implements CommentService {
         comment.setCreated(LocalDateTime.now());
         comment.setEvent(event);
         comment.setStatus(CommentStatus.PENDING);
-
         Comment newComment = commentRepository.save(comment);
 
         return commentMapper.toDto(newComment);

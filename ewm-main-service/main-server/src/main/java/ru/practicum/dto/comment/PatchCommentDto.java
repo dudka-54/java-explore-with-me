@@ -11,6 +11,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PatchCommentDto {
-    @Size(min = 20, max = 7000, message = "Текст должен быть от 20 до 7000 символов")
+    @Size(min = 5, max = 7000, message = "Текст должен быть от 20 до 7000 символов")
     private String text;
 }

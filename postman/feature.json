@@ -350,7 +350,7 @@
         "url": {
           "raw": "{{baseUrl}}/events/comments/{{commentId}}",
           "host": ["{{baseUrl}}"],
-          "path": ["comments", "{{commentId}}"]
+          "path": ["events", "comments", "{{commentId}}"]
         }
       }
     },
